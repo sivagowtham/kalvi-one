@@ -45,7 +45,7 @@ def student_post(batch, **overrides):
         "status": "studying",
         "aadhaar_number": "",
         "community_cert_no": "",
-        **inline_management({"guardians": 0, "consents": 0}),
+        **inline_management({"semesters": 0, "guardians": 0, "consents": 0}),
     }
     return data | overrides
 
@@ -71,7 +71,7 @@ def test_office_adds_a_student_with_aadhaar_and_a_guardian(client, college_a, co
         core_a["be_cse_batch"],
         aadhaar_number=f"{number[:4]} {number[4:8]} {number[8:]}",
         community_cert_no="TN-CC-1",
-        **inline_management({"guardians": 1, "consents": 0}),
+        **inline_management({"semesters": 0, "guardians": 1, "consents": 0}),
         **{
             "guardians-0-relation": "father",
             "guardians-0-name": "Fake Father",
@@ -151,7 +151,13 @@ def test_exam_cell_edits_only_the_register_number(client, college_a, core_a, stu
     client.force_login(make_user(college_a, "exams", roles=[Role.EXAM_CELL]))
     url = f"/admin/students/student/{student.pk}/change/"
     response = client.post(
-        url, {"register_number": "712226104001", "name": "Changed"}, HTTP_HOST=ALPHA
+        url,
+        {
+            "register_number": "712226104001",
+            "name": "Changed",
+            **inline_management({"semesters": 0}),
+        },
+        HTTP_HOST=ALPHA,
     )
     assert response.status_code == 302
     student.refresh_from_db()
@@ -176,3 +182,13 @@ def test_list_shows_only_own_college(client, core_b, make_student, office, stude
 def test_consent_admin_lists(client, office, student):
     client.force_login(office)
     assert client.get("/admin/students/consent/", HTTP_HOST=ALPHA).status_code == 200
+
+
+def test_unsaved_student_shows_no_reveal_link(client, core_a, office):
+    """A failed add keeps the typed secrets on the unsaved instance; no link may be built."""
+    client.force_login(office)
+    data = student_post(core_a["be_cse_batch"], aadhaar_number=fake_aadhaar(12))
+    del data["semesters-TOTAL_FORMS"]  # broken inline: the page re-renders with the instance
+    response = client.post(ADD, data, HTTP_HOST=ALPHA)
+    assert response.status_code == 200
+    assert "Reveal (audited)" not in response.content.decode()

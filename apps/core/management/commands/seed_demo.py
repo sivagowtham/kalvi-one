@@ -15,7 +15,15 @@ from apps.accounts.models import RoleAssignment, User
 from apps.accounts.roles import STAFF_ROLES, Role
 from apps.audit.context import audit_context
 from apps.students.fakes import fake_aadhaar
-from apps.students.models import Batch, Consent, Guardian, Section, Student
+from apps.students.models import (
+    Batch,
+    Consent,
+    Guardian,
+    Section,
+    Student,
+    StudentSemester,
+)
+from apps.students.promotion import place
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
 
@@ -199,7 +207,8 @@ class Command(BaseCommand):
                 batches.append(batch)
                 for name in spec.sections:
                     Section.objects.get_or_create(batch=batch, name=name, defaults={"capacity": 60})
-            self._seed_students(spec, fake, batches)
+            odd_term = Semester.objects.get(academic_year=year, term=Semester.Term.ODD)
+            self._seed_students(spec, fake, batches, odd_term)
             first_department = departments[spec.departments[0][0]]
             self.stdout.write(f"\n{college.name}  ->  http://{college.slug}.localhost:8000/admin/")
             for suffix, roles in USERS:
@@ -233,15 +242,19 @@ class Command(BaseCommand):
 
     COMMUNITIES = ("OC", "BC", "BC", "BCM", "MBC", "MBC", "SC", "SCA", "ST")
 
-    def _seed_students(self, spec: CollegeSpec, fake, batches) -> None:
+    def _seed_students(self, spec: CollegeSpec, fake, batches, term) -> None:
         """Fake students with guardians and guardian consent (D10). Roll numbers run on
         from the college's prefix, so the demo student login is the first student."""
         serial = 0
         for batch in batches:
-            for _ in range(spec.students_per_batch):
+            sections = list(batch.sections.order_by("name"))
+            for index in range(spec.students_per_batch):
                 serial += 1
                 roll = f"{spec.roll_prefix}{serial:03d}"
-                if Student.objects.filter(roll_number=roll).exists():
+                existing = Student.objects.filter(roll_number=roll).first()
+                if existing is not None:
+                    if not StudentSemester.objects.filter(student=existing, semester=term).exists():
+                        place(existing, term, sections[index % len(sections)], 1)
                     continue
                 gender = fake.random_element(["male", "female"])
                 name = fake.first_name_male() if gender == "male" else fake.first_name_female()
@@ -291,3 +304,4 @@ class Command(BaseCommand):
                     given_by=Consent.GivenBy.GUARDIAN,
                     guardian=guardian,
                 )
+                place(student, term, sections[index % len(sections)], 1)

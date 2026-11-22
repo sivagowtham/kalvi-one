@@ -498,3 +498,77 @@ class Consent(Audited, TenantModel):
         if self.guardian_id and self.guardian.student_id != self.student_id:
             raise ValidationError("The guardian must belong to the same student.")
         super().save(*args, **kwargs)
+
+
+class StudentSemester(Audited, TenantModel):
+    """Where a student is in one term: semester number and section (D17).
+
+    One row per student per term, so section changes and promotions keep their history.
+    """
+
+    class Status(models.TextChoices):
+        STUDYING = "studying", "Studying"
+        DETAINED = "detained", "Detained"
+        BREAK = "break", "Break of study"
+        COMPLETED = "completed", "Completed"
+
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="semesters")
+    semester = models.ForeignKey(
+        "academics.Semester",
+        on_delete=models.PROTECT,
+        related_name="student_semesters",
+        help_text="The term (odd or even) of an academic year.",
+    )
+    semester_number = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(12)]
+    )
+    section = models.ForeignKey(Section, on_delete=models.PROTECT, related_name="placements")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.STUDYING)
+
+    class Meta:
+        ordering = ["student", "semester__start_date"]
+        verbose_name = "student semester"
+        constraints = [
+            models.UniqueConstraint(fields=["student", "semester"], name="one_row_per_term"),
+            models.CheckConstraint(
+                condition=models.Q(semester_number__gte=1, semester_number__lte=12),
+                name="student_semester_number_range",
+            ),
+        ]
+        indexes = [models.Index(fields=["section", "semester"])]
+
+    def __str__(self) -> str:
+        return f"{self.student.roll_number} semester {self.semester_number} ({self.semester})"
+
+    def save(self, *args, **kwargs):
+        self.check_placement()
+        super().save(*args, **kwargs)
+
+    @property
+    def scope_department_id(self) -> int | None:
+        return self.student.scope_department_id if self.student_id else None
+
+    def check_placement(self) -> None:
+        """Section in the student's batch, a semester the programme has, and the right term."""
+        from django.core.exceptions import ValidationError
+
+        errors = {}
+        if self.section_id and self.student_id and self.section.batch_id != self.student.batch_id:
+            errors["section"] = "The section must belong to the student's batch."
+        if self.student_id and self.semester_number:
+            total = self.student.batch.programme.total_semesters
+            if self.semester_number > total:
+                errors["semester_number"] = f"The programme has only {total} semesters."
+            elif self.semester_id and self.semester_number not in self.semester.semester_numbers(
+                total
+            ):
+                errors["semester_number"] = (
+                    f"Semester {self.semester_number} does not run in the "
+                    f"{self.semester.get_term_display().lower()} term."
+                )
+        if errors:
+            raise ValidationError(errors)
+
+    def clean(self) -> None:
+        super().clean()
+        self.check_placement()

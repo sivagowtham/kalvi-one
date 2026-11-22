@@ -1,7 +1,7 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
@@ -11,8 +11,8 @@ from apps.academics.models import Programme
 from apps.accounts.permissions import has_perm, hod_department_ids
 from apps.tenancy.admin import TenantModelAdmin
 
-from . import config
-from .models import Batch, Consent, Guardian, Section, Student
+from . import config, promotion
+from .models import Batch, Consent, Guardian, Section, Student, StudentSemester
 from .validators import normalise_aadhaar
 
 
@@ -21,6 +21,89 @@ class BatchAdmin(DepartmentScopedAdmin):
     list_display = ["programme", "label", "admission_year", "regulation", "is_active"]
     list_filter = ["is_active", "admission_year", "programme"]
     search_fields = ["label", "programme__code", "programme__name"]
+    readonly_fields = ["promote_link"]
+
+    @admin.display(description="Promotion")
+    def promote_link(self, obj):
+        if obj is None or obj.pk is None:
+            return "Save the batch first."
+        url = reverse("admin:students_batch_promote", args=[obj.pk])
+        return format_html('<a href="{}">Promote this batch to the next term</a>', url)
+
+    def get_urls(self):
+        promote = path(
+            "<int:pk>/promote/",
+            self.admin_site.admin_view(self.promote_view),
+            name="students_batch_promote",
+        )
+        return [promote, *super().get_urls()]
+
+    def promote_view(self, request, pk):
+        from apps.academics.models import Semester
+
+        batch = get_object_or_404(Batch.objects.select_related("programme"), pk=pk)
+        if not has_perm(request.user, "students.promote_batch", batch):
+            raise PermissionDenied
+        terms = (
+            Semester.objects.filter(student_semesters__student__batch=batch)
+            .distinct()
+            .order_by("-start_date")
+        )
+        term_id = request.POST.get("term") or request.GET.get("term")
+        from_term = (
+            get_object_or_404(terms, pk=term_id)
+            if term_id
+            else terms.filter(is_current=True).first() or terms.first()
+        )
+        back = reverse("admin:students_batch_change", args=[pk])
+        if from_term is None:
+            messages.warning(request, "No student in this batch has been placed in a term yet.")
+            return redirect(back)
+        plan = promotion.preview(batch, from_term)
+        if request.method == "POST":
+            hold_back = {
+                row.current.pk for row in plan.rows if request.POST.get(f"hold_{row.current.pk}")
+            }
+            sections = {
+                row.current.pk: int(request.POST[f"section_{row.current.pk}"])
+                for row in plan.rows
+                if request.POST.get(f"section_{row.current.pk}", "").isdigit()
+            }
+            try:
+                counts = promotion.promote(
+                    request.user, batch, from_term, hold_back=hold_back, sections=sections
+                )
+            except ValidationError as error:
+                messages.error(request, " ".join(error.messages))
+            else:
+                messages.success(
+                    request,
+                    f"Promoted {counts['promoted']}, detained {counts['detained']}, "
+                    f"finished the course {counts['completed']}.",
+                )
+                return redirect(back)
+        load = promotion.section_load(plan.promotable, {})
+        warnings = [
+            f"Section {section.name} would have {count} students, above its capacity of "
+            f"{section.capacity}."
+            for section, count in load.items()
+            if section.capacity and count > section.capacity
+        ]
+        return TemplateResponse(
+            request,
+            "admin/students/promote.html",
+            {
+                **self.admin_site.each_context(request),
+                "title": f"Promote {batch}",
+                "batch": batch,
+                "plan": plan,
+                "terms": terms,
+                "sections": batch.sections.all(),
+                "warnings": warnings,
+                "back_url": back,
+                "opts": self.model._meta,
+            },
+        )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "programme" and is_hod_only(request, "students.add_batch"):
@@ -81,6 +164,17 @@ class ConsentInline(admin.TabularInline):
     model = Consent
     extra = 0
     fields = ["notice_version", "given_by", "guardian", "method", "given_at", "withdrawn_at"]
+
+
+class StudentSemesterInline(admin.TabularInline):
+    model = StudentSemester
+    extra = 0
+    fields = ["semester", "semester_number", "section", "status"]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "section":
+            kwargs["queryset"] = Section.objects.select_related("batch__programme")
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class StudentForm(forms.ModelForm):
@@ -193,7 +287,7 @@ class StudentAdmin(DepartmentScopedAdmin):
     search_fields = ["roll_number", "admission_number", "register_number", "name", "mobile"]
     list_select_related = ["batch__programme"]
     readonly_fields = ["aadhaar_on_file", "community_cert_on_file"]
-    inlines = [GuardianInline, ConsentInline]
+    inlines = [StudentSemesterInline, GuardianInline, ConsentInline]
 
     def get_fieldsets(self, request, obj=None):
         if sees_sensitive(request):
@@ -224,7 +318,9 @@ class StudentAdmin(DepartmentScopedAdmin):
         return readonly
 
     def get_inlines(self, request, obj):
-        return self.inlines if sees_sensitive(request) else []
+        if sees_sensitive(request):
+            return self.inlines
+        return [StudentSemesterInline]
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "user":
@@ -235,14 +331,14 @@ class StudentAdmin(DepartmentScopedAdmin):
 
     @admin.display(description="Aadhaar on file")
     def aadhaar_on_file(self, obj):
-        if obj is None or not obj.has_secret("aadhaar"):
+        if obj is None or obj.pk is None or not obj.has_secret("aadhaar"):
             return "not recorded"
         url = reverse("admin:students_student_reveal", args=[obj.pk, "aadhaar"])
         return format_html('{} <a href="{}">Reveal (audited)</a>', obj.masked("aadhaar"), url)
 
     @admin.display(description="Certificate on file")
     def community_cert_on_file(self, obj):
-        if obj is None or not obj.has_secret("community_cert_no"):
+        if obj is None or obj.pk is None or not obj.has_secret("community_cert_no"):
             return "not recorded"
         url = reverse("admin:students_student_reveal", args=[obj.pk, "community_cert_no"])
         return format_html('recorded <a href="{}">Reveal (audited)</a>', url)
@@ -279,3 +375,11 @@ class ConsentAdmin(TenantModelAdmin):
     list_display = ["student", "notice_version", "given_by", "method", "given_at", "withdrawn_at"]
     list_filter = ["notice_version", "given_by", "method"]
     search_fields = ["student__roll_number", "student__name"]
+
+
+@admin.register(StudentSemester)
+class StudentSemesterAdmin(DepartmentScopedAdmin):
+    list_display = ["student", "semester", "semester_number", "section", "status"]
+    list_filter = ["semester", "semester_number", "status", "section__batch"]
+    search_fields = ["student__roll_number", "student__name"]
+    list_select_related = ["student", "semester__academic_year", "section__batch__programme"]
