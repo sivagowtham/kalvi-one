@@ -12,3 +12,9 @@ ALLOWED_HOSTS = [".localhost", "testserver"]
 
 # Fast hashing in tests only; production uses Argon2 (see base.py).
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+INSTALLED_APPS = [*INSTALLED_APPS, "tests.testapp"]  # noqa: F405
+
+TENANT_BASE_DOMAINS = ["localhost"]
+TENANT_PLATFORM_HOSTS = ["testserver", "localhost"]
+TENANT_DEDICATED_COLLEGE_SLUG = ""

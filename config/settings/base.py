@@ -27,10 +27,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # KalviOne apps
     "apps.core",
+    "apps.tenancy",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.tenancy.middleware.TenantMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -63,6 +65,13 @@ ASGI_APPLICATION = "config.asgi.application"
 # postgres://kalvione:kalvione@localhost:5432/kalvione
 DATABASES = {"default": env.db("DATABASE_URL")}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
+
+# Multi-tenancy (D2, D12). A college is served on <slug>.<base domain>.
+TENANT_BASE_DOMAINS = env.list("TENANT_BASE_DOMAINS", default=["localhost"])
+# Hosts that serve the platform itself (no college), e.g. the bare domain.
+TENANT_PLATFORM_HOSTS = env.list("TENANT_PLATFORM_HOSTS", default=["localhost", "127.0.0.1"])
+# Dedicated deployment: serve this one college on every host. Empty for SaaS.
+TENANT_DEDICATED_COLLEGE_SLUG = env("TENANT_DEDICATED_COLLEGE_SLUG", default="")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

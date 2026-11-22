@@ -41,6 +41,8 @@ select = [
     "SIM",  # simplify
     "RUF",  # ruff-specific
 ]
+# Django declares Meta options and admin options as mutable class attributes by design.
+ignore = ["RUF012"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S106"]  # assert and hard-coded test passwords are fine in tests
