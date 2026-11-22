@@ -15,12 +15,14 @@ How to use this file:
 | D3 | Working product name KalviOne, repo `kalvi-one` | Accepted |
 | D4 | Shared database and schema, college column on every college-owned row | Accepted |
 | D5 | Python 3.13, Django 5.2 LTS, PostgreSQL 17 | Accepted |
+| D6 | Custom user model from the first migration; each user belongs to one college, platform staff to none | Accepted |
+| D7 | Fixed roles in code, assignments in the database, one permission registry, default deny enforced by a test | Accepted |
 | D10 | Only fake data in the repo, seeds and CI | Accepted |
 | D11 | Tooling: uv, ruff, pytest-django, factory_boy, GitHub Actions | Accepted |
 | D12 | Current college resolved from the host and held in a context variable; tenant queries fail closed | Accepted |
 | D13 | Per-college configuration in a JSON field, rare needs as per-college feature flags | Accepted |
 
-D6 to D9 (custom user model, roles and permissions, audit log, semester as term) will be recorded in the pull requests that implement them.
+D8 (audit log) and D9 (semester as term) will be recorded in the pull requests that implement them.
 
 ---
 
@@ -110,3 +112,29 @@ D6 to D9 (custom user model, roles and permissions, audit log, semester as term)
 - **Decision:** `College.config` is a JSON field for structured settings such as the grading scheme or regulation year. Each key is owned and documented by the module that reads it. `CollegeFeature (college, key, enabled)` holds on/off switches, read with `college.has_feature("key")`. Fixed facts about a college that many modules read (type, autonomous or affiliated, affiliating university) are ordinary columns.
 - **Alternatives:** A settings table per module (more tables, more migrations); a feature-flag library such as django-waffle (more than we need for per-college switches).
 - **Consequences:** A config key that becomes important or needs validation is promoted to its own column or model through a decision entry.
+
+## D6. Users belong to one college
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (default for plan question 1, approved by Gowtham)
+- **Context:** Swapping Django's user model after the first migration is painful. Every user must be tied to a college for D4 to hold.
+- **Decision:**
+  - Each user belongs to exactly one college, set in `accounts.User.college`, from the first migration.
+  - Usernames are unique within a college, not across colleges. Staff use their email and students their roll number.
+  - Platform staff have no college. Only they can be superusers, which a database constraint enforces, and they can log in only on platform hosts.
+  - `CollegeBackend` looks a username up only in the current college, and re-checks the college on every request that uses a session. A session cookie copied to another college's subdomain is ignored.
+- **Alternatives:** One account shared across colleges through a membership table. This is more flexible for trust administrators and faculty who teach at both colleges, but every check becomes harder. If that need is confirmed, a later decision can add a membership model.
+- **Consequences:** A person working in two colleges has two accounts. `auth.W004` is silenced because usernames are deliberately not globally unique. The Django `Group` and per-user permission tables are not used.
+
+## D7. Roles, permissions and default deny
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Decision:**
+  - The roles (principal, HOD, faculty, office, accounts, exam cell, student, parent) are a fixed `Role` enum in code. `RoleAssignment` rows give users roles in their own college, and a user can hold several.
+  - Each app declares its permissions in `grants.py` as `register(code, roles, description)`. Codes are Django model permissions such as `academics.change_department`, so Django admin works unchanged, or custom actions.
+  - `has_perm(user, code)` is true only when one of the user's roles in the current college is granted the code. Unknown codes raise in our own code and are denied through Django's API.
+  - Views use `@require_perm(code)` or `@public`. A test walks every URL and fails on any view with neither mark. Django admin is the one exception, because it checks `User.has_perm`, which uses the same registry.
+  - Denied requests send a `permission_denied` signal, which the audit log will record.
+- **Alternatives:** Django groups and permissions edited in admin. These are flexible, but access rules then live in the database where code review never sees them. django-guardian (object-level permissions) is more than we need now.
+- **Consequences:** Changing who can do what is a code change, visible in review. Object-level rules, such as a HOD's scope stopping at their own department, are added per permission when the models exist (PR 5).
