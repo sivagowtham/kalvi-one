@@ -39,6 +39,7 @@ class AuditEvent(models.Model):
         LOGIN_FAILED = "login_failed", "Login failed"
         LOGOUT = "logout", "Logged out"
         PERMISSION_DENIED = "permission_denied", "Permission denied"
+        VIEW_SENSITIVE = "view_sensitive", "Viewed a sensitive field"
 
     # Null only for platform-level events (platform staff logins, platform admin work).
     college = models.ForeignKey(

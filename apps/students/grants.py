@@ -22,3 +22,22 @@ for model in ["batch", "section"]:
             department_scoped=True,
         )
     register(f"students.delete_{model}", [Role.PRINCIPAL], f"Delete an empty {model}")
+
+STAFF_READERS = READERS
+CLERKS = [Role.PRINCIPAL, Role.OFFICE]
+
+register("students.view_student", STAFF_READERS, "See student records (without sensitive fields)")
+register("students.add_student", CLERKS, "Add students")
+# The exam cell edits only register numbers; the admin makes every other field read-only
+# for users without students.edit_student_details.
+register("students.change_student", [*CLERKS, Role.EXAM_CELL], "Change students")
+register("students.edit_student_details", CLERKS, "Change any field of a student record")
+register(
+    "students.view_sensitive",
+    CLERKS,
+    "See community, caste, guardians and income, and reveal Aadhaar (D18, D19)",
+)
+for model in ["guardian", "consent"]:
+    for action in ["view", "add", "change"]:
+        register(f"students.{action}_{model}", CLERKS, f"{action} {model} records")
+# No delete permissions for students, guardians or consent: records change status instead.

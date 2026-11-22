@@ -3,6 +3,12 @@
 import os
 
 os.environ.setdefault("DJANGO_SECRET_KEY", "test-only-not-secret")
+# Fake keys for tests and CI only (D10, D18). Never use them anywhere else.
+os.environ.setdefault(
+    "FIELD_ENCRYPTION_KEYS",
+    "dGVzdC1vbmx5LWtleS1kby1ub3QtdXNlLWFueXdoZXI=",
+)
+os.environ.setdefault("FIELD_HASH_KEY", "test-only-hash-key")
 os.environ.setdefault("DATABASE_URL", "postgres://kalvione:kalvione@localhost:5432/kalvione")
 
 from .base import *  # noqa: F403

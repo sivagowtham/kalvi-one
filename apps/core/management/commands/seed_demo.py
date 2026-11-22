@@ -14,7 +14,8 @@ from apps.academics.models import AcademicYear, Course, Department, Programme, S
 from apps.accounts.models import RoleAssignment, User
 from apps.accounts.roles import STAFF_ROLES, Role
 from apps.audit.context import audit_context
-from apps.students.models import Batch, Section
+from apps.students.fakes import fake_aadhaar
+from apps.students.models import Batch, Consent, Guardian, Section, Student
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
 
@@ -34,6 +35,8 @@ class CollegeSpec:
     courses: tuple[tuple[str, int, str, str, str, str], ...]  # prog, sem, code, title, cr, type
     roll_prefix: str
     sections: tuple[str, ...] = ("A",)
+    students_per_batch: int = 6
+    aadhaar_base: int = 0
 
 
 DEMO = CollegeSpec(
@@ -81,6 +84,8 @@ SAMPLE = CollegeSpec(
         ("BCOM", 1, "SC101", "Financial Accounting I", "4", "theory"),
     ),
     roll_prefix="26SCAS",
+    students_per_batch=4,
+    aadhaar_base=5000,
 )
 
 # username suffix, roles, staff?
@@ -188,10 +193,13 @@ class Command(BaseCommand):
                 term=Semester.Term.EVEN,
                 defaults={"start_date": dt.date(2026, 12, 15), "end_date": dt.date(2027, 4, 30)},
             )
+            batches = []
             for programme in programmes.values():
                 batch, _ = Batch.objects.get_or_create(programme=programme, admission_year=year)
+                batches.append(batch)
                 for name in spec.sections:
                     Section.objects.get_or_create(batch=batch, name=name, defaults={"capacity": 60})
+            self._seed_students(spec, fake, batches)
             first_department = departments[spec.departments[0][0]]
             self.stdout.write(f"\n{college.name}  ->  http://{college.slug}.localhost:8000/admin/")
             for suffix, roles in USERS:
@@ -217,3 +225,69 @@ class Command(BaseCommand):
                         department=first_department if role == Role.HOD else None,
                     )
                 self.stdout.write(f"  {', '.join(r.label for r in roles):<28} {username}")
+                if suffix == "student":
+                    first = Student.objects.filter(roll_number=username).first()
+                    if first is not None and first.user_id is None:
+                        first.user = user
+                        first.save()
+
+    COMMUNITIES = ("OC", "BC", "BC", "BCM", "MBC", "MBC", "SC", "SCA", "ST")
+
+    def _seed_students(self, spec: CollegeSpec, fake, batches) -> None:
+        """Fake students with guardians and guardian consent (D10). Roll numbers run on
+        from the college's prefix, so the demo student login is the first student."""
+        serial = 0
+        for batch in batches:
+            for _ in range(spec.students_per_batch):
+                serial += 1
+                roll = f"{spec.roll_prefix}{serial:03d}"
+                if Student.objects.filter(roll_number=roll).exists():
+                    continue
+                gender = fake.random_element(["male", "female"])
+                name = fake.first_name_male() if gender == "male" else fake.first_name_female()
+                father = fake.first_name_male()
+                student = Student(
+                    batch=batch,
+                    roll_number=roll,
+                    admission_number=f"ADM26{serial:04d}",
+                    name=name.upper(),
+                    initials=f"{father[0]}.",
+                    gender=gender,
+                    date_of_birth=dt.date(2008, 1, 1) + dt.timedelta(days=serial * 17),
+                    community=fake.random_element(self.COMMUNITIES),
+                    religion="Hindu",
+                    mother_tongue="Tamil",
+                    is_first_graduate=serial % 3 == 0,
+                    is_govt_school_student=serial % 4 == 0,
+                    quota="GOVT" if serial % 3 else "MGMT",
+                    qualifying_board="State Board",
+                    year_of_passing=2026,
+                    qualifying_percent=Decimal(70 + serial % 29),
+                    residence="hostel" if serial % 2 else "day_scholar",
+                    mobile=f"9{serial:09d}",
+                    admission_date=dt.date(2026, 8, 1),
+                    pincode="642001",
+                )
+                student.set_secret("aadhaar", fake_aadhaar(spec.aadhaar_base + serial))
+                student.save()
+                guardian = Guardian(
+                    student=student,
+                    relation=Guardian.Relation.FATHER,
+                    name=f"{father} {fake.last_name()}".upper(),
+                    occupation=fake.random_element(["Farmer", "Driver", "Teacher", "Business"]),
+                    mobile=f"8{serial:09d}",
+                    is_primary=True,
+                )
+                guardian.set_secret("annual_income", str(60000 + serial * 15000))
+                guardian.save()
+                Guardian.objects.create(
+                    student=student,
+                    relation=Guardian.Relation.MOTHER,
+                    name=f"{fake.first_name_female()} {fake.last_name()}".upper(),
+                )
+                Consent.objects.create(
+                    student=student,
+                    notice_version="v1",
+                    given_by=Consent.GivenBy.GUARDIAN,
+                    guardian=guardian,
+                )

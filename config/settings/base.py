@@ -18,6 +18,13 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 
+# Field-level encryption for sensitive personal data such as Aadhaar (D18).
+# FIELD_ENCRYPTION_KEYS: Fernet keys, comma-separated. The first encrypts; all decrypt,
+# so a key can be rotated by putting the new key first. FIELD_HASH_KEY keys the HMAC
+# used to find duplicates without decrypting. Production refuses to start without them.
+FIELD_ENCRYPTION_KEYS = env.list("FIELD_ENCRYPTION_KEYS", default=[])
+FIELD_HASH_KEY = env("FIELD_HASH_KEY", default="")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

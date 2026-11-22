@@ -25,3 +25,23 @@ def core_a(college_a):
 @pytest.fixture
 def core_b(college_b):
     return build_batches(college_b, "Beta ")
+
+
+@pytest.fixture
+def make_student():
+    """make_student(core, "26CSE001", batch_key="be_cse_batch", **fields)"""
+    from apps.students.models import Student
+
+    def _make(core, roll, *, batch_key="be_cse_batch", **fields):
+        batch = core[batch_key]
+        defaults = {
+            "admission_number": f"ADM{roll}",
+            "name": f"Student {roll}",
+            "gender": "female",
+            "community": "BC",
+            "quota": "GOVT",
+        }
+        with college_context(batch.college):
+            return Student.objects.create(batch=batch, roll_number=roll, **(defaults | fields))
+
+    return _make

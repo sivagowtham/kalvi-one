@@ -1,0 +1,7 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>{{ label }} of {{ object }}</h1>
+<p style="font-size: 1.4em; font-family: monospace;">{{ value|default:"(not recorded)" }}</p>
+<p>This view was recorded in the audit log.</p>
+<p><a href="{{ back_url }}">Back to the student</a></p>
+{% endblock %}
