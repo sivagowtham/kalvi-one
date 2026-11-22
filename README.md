@@ -16,6 +16,8 @@ make migrate            # in a second terminal
 
 Check it is running at http://localhost:8000/health/.
 
+Each college is served on its own subdomain. With a college whose slug is `demo`, open http://demo.localhost:8000/. Browsers send `*.localhost` to your own machine, so no DNS setup is needed.
+
 ## Tests and lint
 
 The tests need PostgreSQL. Start just the database with `docker compose up db`, then:
@@ -32,6 +34,7 @@ make check              # everything CI runs
 | Path | What it holds |
 | --- | --- |
 | `config/` | Settings for dev, test and prod, plus URLs, WSGI and ASGI |
-| `apps/` | Django apps (`core` for now; tenancy, accounts, audit and academics follow) |
+| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware); accounts, audit and academics follow |
+| `tests/testapp/` | Models used only by tests to exercise TenantModel |
 | `tests/` | Project-wide tests |
 | `docs/decisions.md` | Every architecture decision and its reasons |

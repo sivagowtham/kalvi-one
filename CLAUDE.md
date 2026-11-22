@@ -6,3 +6,4 @@
 - Only fake data, everywhere (D10).
 - Tests run on PostgreSQL (D5). Run `make check` before opening a PR. CI must be green.
 - Style: ruff with line length 100. Settings come from environment variables via django-environ.
+- Every college-owned model extends `apps.tenancy.models.TenantModel` and gets isolation tests (D4, D12). Treat `all_colleges` and raw SQL as review flags.

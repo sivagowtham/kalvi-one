@@ -17,6 +17,8 @@ How to use this file:
 | D5 | Python 3.13, Django 5.2 LTS, PostgreSQL 17 | Accepted |
 | D10 | Only fake data in the repo, seeds and CI | Accepted |
 | D11 | Tooling: uv, ruff, pytest-django, factory_boy, GitHub Actions | Accepted |
+| D12 | Current college resolved from the host and held in a context variable; tenant queries fail closed | Accepted |
+| D13 | Per-college configuration in a JSON field, rare needs as per-college feature flags | Accepted |
 
 D6 to D9 (custom user model, roles and permissions, audit log, semester as term) will be recorded in the pull requests that implement them.
 
@@ -85,3 +87,26 @@ D6 to D9 (custom user model, roles and permissions, audit log, semester as term)
   - GitHub Actions CI with three jobs: lint, tests against a PostgreSQL 17 service, and a Docker image build.
 - **Alternatives:** pip-tools or Poetry (slower, more configuration); black, flake8 and isort as separate tools (ruff replaces all three).
 - **Consequences:** A pull request merges only when all three CI jobs pass.
+
+## D12. How the current college is resolved and enforced
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** D2 serves each college on its own subdomain, and D4 needs every query filtered to one college without relying on developers to remember the filter.
+- **Decision:**
+  - `TenantMiddleware` reads the request host. `<slug>.<base domain>` serves the active college with that slug. Hosts listed in `TENANT_PLATFORM_HOSTS` serve the platform with no college. Every other host, unknown slug or inactive college gets a 404.
+  - `TENANT_DEDICATED_COLLEGE_SLUG` makes one instance serve a single college on every host, for the dedicated deployment in D2.
+  - The current college lives in a `ContextVar`, which is isolated per thread and per asyncio task. The middleware sets it for each request and clears it afterwards. Scripts and tests use `with college_context(college):`.
+  - `TenantModel` is the base for every college-owned model. Its default manager filters to the current college and raises `NoCollegeSelected` when none is set. The `all_colleges` manager is the explicit, unfiltered escape hatch.
+  - Saving takes the college from the context. Saving or linking a row across colleges raises `CrossCollegeError`, and so does changing a row's college, including through `bulk_create` and `update`.
+- **Alternatives:** Thread-local storage, which is not safe with async code; passing the college explicitly to every query, which is easy to forget; `django-tenants` or `django-multitenant`, which add a dependency for the small amount of code needed here.
+- **Consequences:** Code outside a request (management commands, background jobs) must set a college or use `all_colleges` deliberately, and reviewers treat any use of `all_colleges` as a flag. Raw SQL bypasses the manager and must filter on `college_id` by hand. Row-level security in PostgreSQL remains a possible second guard.
+
+## D13. Per-college configuration and feature flags
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** D1 says college differences are configuration, never forks.
+- **Decision:** `College.config` is a JSON field for structured settings such as the grading scheme or regulation year. Each key is owned and documented by the module that reads it. `CollegeFeature (college, key, enabled)` holds on/off switches, read with `college.has_feature("key")`. Fixed facts about a college that many modules read (type, autonomous or affiliated, affiliating university) are ordinary columns.
+- **Alternatives:** A settings table per module (more tables, more migrations); a feature-flag library such as django-waffle (more than we need for per-college switches).
+- **Consequences:** A config key that becomes important or needs validation is promoted to its own column or model through a decision entry.
