@@ -30,6 +30,7 @@ How to use this file:
 | D18 | Sensitive personal fields are encrypted per field, masked by default, and need their own permission | Accepted |
 | D19 | Revealing an encrypted field is audited (adds to D8) | Accepted |
 | D20 | Community, quota and document lists and the roll number pattern are per-college config with Tamil Nadu defaults | Accepted |
+| D21 | Admissions use a fixed status flow; enrolment is one transaction that creates the student, login, guardians, consent and first placement | Accepted |
 
 ---
 
@@ -261,3 +262,20 @@ How to use this file:
   - The 7.5% preferential reservation for government school students is a yes/no field on the student, because it also decides some state scholarships.
 - **Alternatives:** Database choices on the model (a migration for every list change, and the same list for every college); a table per list (more admin screens for values that rarely change).
 - **Consequences:** Removing a code from a college's list makes existing students with that code fail validation on their next save, so a code should be renamed with a data fix, not just removed.
+
+## D21. Admission status flow and one-step enrolment
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (plan questions 3, 4 and 7: staff enter applications, documents are a checklist, no parent logins yet)
+- **Context:** An admission passes through the same steps at every college: the application is entered, a seat is offered in a quota, the fee and documents are checked, and the student is enrolled. A half-finished enrolment, such as a student without a login or a login without a section, is hard to clean up.
+- **Decision:**
+  - `Intake` holds sanctioned seats per programme, year and quota. Filled seats are counted from applications that hold a seat (offered, confirmed, enrolled), not stored.
+  - `Application` shares `PersonDetails` with `Student`, plus father, mother, guardian mobile, encrypted income, fee paid (a checkbox until the fees module exists), a document checklist from the college's `required_documents`, and a merit score.
+  - The statuses are draft, submitted, offered, confirmed, enrolled, rejected and withdrawn. `admissions.services.move()` is the only way to change status. It allows only listed moves, refuses an offer when the quota's seats are full, and refuses confirmation until the fee is ticked and every required document is received. Every change is audited, so there is no separate history table.
+  - `services.enrol()` runs in one transaction. It takes the next roll and admission numbers from the college's patterns, copies the personal fields (and the ciphertext as it is, never decrypting), creates a student login with no usable password, creates the guardians and a consent record under the current notice version, and places the student in the chosen section for the current term (semester 3 for lateral entry).
+  - Numbers come from `NumberCounter` rows locked with SELECT FOR UPDATE, so two clerks never get the same number. Numbers already taken, for example by imported students, are skipped.
+  - One open application per Aadhaar per year, and no enrolment of an Aadhaar that already belongs to a student.
+  - Rank lists order by merit score, then qualifying marks, then date of birth (older first), filtered by community if needed, and download as Excel (openpyxl). The community column appears only for users with `students.view_sensitive`.
+  - Applications are never deleted. Rejected, withdrawn and enrolled applications are read-only in admin.
+- **Alternatives:** A workflow library such as django-fsm (another dependency for seven states); creating the student at confirmation (it would leave students for applicants who never join).
+- **Consequences:** The fees module will replace the fee checkbox with a payment check inside `move()`. A public online application form will create applications in draft through the same model. New students need a password set by staff before they can log in.

@@ -18,7 +18,7 @@ docker compose run --rm web python manage.py createsuperuser   # platform admin 
 
 Check it is running at http://localhost:8000/health/.
 
-`make seed` creates two fake colleges, "Demo College of Engineering" at http://demo.localhost:8000/admin/ and "Sample College of Arts and Science" at http://sample.localhost:8000/admin/. Each gets departments, programmes, courses, the 2026-27 academic year a 2026 batch for each programme with its sections, and fake students with guardians and consent records, placed in semester 1 of the current term, plus one user for every role: `principal@demo.example`, `hod@demo.example`, `faculty@demo.example`, `office@demo.example`, `accounts@demo.example`, `examcell@demo.example`, student `26DCE001` and `parent@demo.example`. The password for all of them is `kalvione-demo-123`. The command is safe to run twice, and it refuses to run in production settings.
+`make seed` creates two fake colleges, "Demo College of Engineering" at http://demo.localhost:8000/admin/ and "Sample College of Arts and Science" at http://sample.localhost:8000/admin/. Each gets departments, programmes, courses, the 2026-27 academic year a 2026 batch for each programme with its sections, and fake students with guardians and consent records, placed in semester 1 of the current term, plus seats per quota and fake applications at each admission status, plus one user for every role: `principal@demo.example`, `hod@demo.example`, `faculty@demo.example`, `office@demo.example`, `accounts@demo.example`, `examcell@demo.example`, student `26DCE001` and `parent@demo.example`. The password for all of them is `kalvione-demo-123`. The command is safe to run twice, and it refuses to run in production settings.
 
 Each college is served on its own subdomain. With a college whose slug is `demo`, open http://demo.localhost:8000/. Browsers send `*.localhost` to your own machine, so no DNS setup is needed.
 
@@ -38,7 +38,7 @@ make check              # everything CI runs
 | Path | What it holds |
 | --- | --- |
 | `config/` | Settings for dev, test and prod, plus URLs, WSGI and ASGI |
-| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions), `audit` (append-only audit log), `academics` (departments, programmes, courses, years, terms), `students` (batches, sections, the student record, guardians, consent, field encryption, per-term placement and promotion) |
+| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions), `audit` (append-only audit log), `academics` (departments, programmes, courses, years, terms), `students` (batches, sections, the student record, guardians, consent, field encryption, per-term placement and promotion), `admissions` (seats per quota, applications, enrolment, rank lists) |
 | `tests/testapp/` | Models used only by tests to exercise TenantModel |
 | `tests/` | Project-wide tests |
 | `docs/decisions.md` | Every architecture decision and its reasons |

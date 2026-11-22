@@ -13,6 +13,7 @@ from django.db import transaction
 from apps.academics.models import AcademicYear, Course, Department, Programme, Semester
 from apps.accounts.models import RoleAssignment, User
 from apps.accounts.roles import STAFF_ROLES, Role
+from apps.admissions.models import Application, Intake
 from apps.audit.context import audit_context
 from apps.students.fakes import fake_aadhaar
 from apps.students.models import (
@@ -209,6 +210,7 @@ class Command(BaseCommand):
                     Section.objects.get_or_create(batch=batch, name=name, defaults={"capacity": 60})
             odd_term = Semester.objects.get(academic_year=year, term=Semester.Term.ODD)
             self._seed_students(spec, fake, batches, odd_term)
+            self._seed_admissions(spec, fake, programmes.values(), year)
             first_department = departments[spec.departments[0][0]]
             self.stdout.write(f"\n{college.name}  ->  http://{college.slug}.localhost:8000/admin/")
             for suffix, roles in USERS:
@@ -239,6 +241,47 @@ class Command(BaseCommand):
                     if first is not None and first.user_id is None:
                         first.user = user
                         first.save()
+
+    def _seed_admissions(self, spec: CollegeSpec, fake, programmes, year) -> None:
+        """Seats per quota and a few fake applications at each status (D10, D21)."""
+        statuses = ["draft", "submitted", "submitted", "offered", "confirmed"]
+        serial = 0
+        for programme in programmes:
+            for quota, seats in [("GOVT", 60), ("MGMT", 30)]:
+                Intake.objects.get_or_create(
+                    academic_year=year,
+                    programme=programme,
+                    quota=quota,
+                    defaults={"sanctioned_seats": seats},
+                )
+            for status in statuses:
+                serial += 1
+                marker = f"FAKE{serial}"
+                if Application.objects.filter(tnea_application_no=marker).exists():
+                    continue
+                gender = fake.random_element(["male", "female"])
+                name = fake.first_name_male() if gender == "male" else fake.first_name_female()
+                application = Application(
+                    academic_year=year,
+                    programme=programme,
+                    name=name.upper(),
+                    gender=gender,
+                    date_of_birth=dt.date(2008, 2, 1) + dt.timedelta(days=serial * 11),
+                    community=fake.random_element(self.COMMUNITIES),
+                    quota="GOVT" if serial % 2 else "MGMT",
+                    qualifying_percent=Decimal(60 + (serial * 7) % 39),
+                    tnea_application_no=marker,
+                    father_name=fake.first_name_male().upper(),
+                    mother_name=fake.first_name_female().upper(),
+                    guardian_mobile=f"7{serial:09d}",
+                    status=status,
+                    fee_paid=status == "confirmed",
+                    documents={"TC": True, "SSLC": True, "HSC": True, "COMMUNITY": True}
+                    if status == "confirmed"
+                    else {},
+                )
+                application.set_secret("aadhaar", fake_aadhaar(spec.aadhaar_base + 900 + serial))
+                application.save()
 
     COMMUNITIES = ("OC", "BC", "BC", "BCM", "MBC", "MBC", "SC", "SCA", "ST")
 

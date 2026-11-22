@@ -1,0 +1,21 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Rank list</h1>
+<form method="get">
+  <select name="year">{% for y in years %}<option value="{{ y.pk }}"{% if y.pk == year.pk %} selected{% endif %}>{{ y }}</option>{% endfor %}</select>
+  <select name="programme"><option value="">Choose a programme</option>{% for p in programmes %}<option value="{{ p.pk }}"{% if p.pk == programme.pk %} selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+  {% if show_category %}<select name="community"><option value="">All communities</option>{% for code, label in communities %}<option value="{{ code }}"{% if code == community %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endif %}
+  <input type="submit" value="Show">
+  {% if rows %}<button type="submit" name="format" value="xlsx">Download Excel</button>{% endif %}
+</form>
+{% if rows %}
+<table>
+  <thead><tr><th>Rank</th><th>Application</th><th>Name</th><th>Date of birth</th>{% if show_category %}<th>Community</th>{% endif %}<th>Quota</th><th>Marks %</th><th>Merit</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr><td>{{ forloop.counter }}</td><td>{{ row.application_number }}</td><td>{{ row.display_name }}</td><td>{{ row.date_of_birth|default:"" }}</td>{% if show_category %}<td>{{ row.community }}</td>{% endif %}<td>{{ row.quota }}</td><td>{{ row.qualifying_percent|default:"" }}</td><td>{{ row.merit_score|default:"" }}</td><td>{{ row.get_status_display }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% elif programme %}<p>No applications yet.</p>{% endif %}
+{% endblock %}

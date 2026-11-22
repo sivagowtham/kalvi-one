@@ -572,3 +572,22 @@ class StudentSemester(Audited, TenantModel):
     def clean(self) -> None:
         super().clean()
         self.check_placement()
+
+
+class NumberCounter(TenantModel):
+    """The last number handed out for one prefix, e.g. 26CSE -> 42 (D21).
+
+    Not audited: it holds no personal data, and every number it gives out is recorded on the
+    row that uses it.
+    """
+
+    key = models.CharField(max_length=50)
+    last_value = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["college", "key"], name="unique_counter_key")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.key}: {self.last_value}"
