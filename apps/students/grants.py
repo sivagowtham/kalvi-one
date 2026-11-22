@@ -56,3 +56,8 @@ register(
     "Promote a batch to the next term",
     department_scoped=True,
 )
+
+register("students.import_students", CLERKS, "Import students from Excel (D22)")
+for action in ["view", "add", "change"]:
+    register(f"students.{action}_importmapping", CLERKS, f"{action} saved import layouts")
+register("students.view_importrun", CLERKS, "See past imports")

@@ -38,7 +38,7 @@ make check              # everything CI runs
 | Path | What it holds |
 | --- | --- |
 | `config/` | Settings for dev, test and prod, plus URLs, WSGI and ASGI |
-| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions), `audit` (append-only audit log), `academics` (departments, programmes, courses, years, terms), `students` (batches, sections, the student record, guardians, consent, field encryption, per-term placement and promotion), `admissions` (seats per quota, applications, enrolment, rank lists) |
+| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions), `audit` (append-only audit log), `academics` (departments, programmes, courses, years, terms), `students` (batches, sections, the student record, guardians, consent, field encryption, per-term placement, promotion and Excel import), `admissions` (seats per quota, applications, enrolment, rank lists) |
 | `tests/testapp/` | Models used only by tests to exercise TenantModel |
 | `tests/` | Project-wide tests |
 | `docs/decisions.md` | Every architecture decision and its reasons |
