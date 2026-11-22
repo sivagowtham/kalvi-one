@@ -20,7 +20,9 @@ def walk(patterns, prefix="", namespaces=()):
 def is_marked(callback) -> bool:
     targets = [callback, getattr(callback, "view_class", None)]
     return any(
-        getattr(t, "kalvi_permission", None) or getattr(t, "kalvi_public", False)
+        getattr(t, "kalvi_permission", None)
+        or getattr(t, "kalvi_public", False)
+        or getattr(t, "kalvi_login_only", False)
         for t in targets
         if t is not None
     )

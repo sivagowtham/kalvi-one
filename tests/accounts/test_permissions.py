@@ -88,7 +88,7 @@ class TestProtectedView:
     def test_anonymous_is_sent_to_login(self, client, college_a):
         response = client.get(self.url, HTTP_HOST="alpha.localhost")
         assert response.status_code == 302
-        assert "/admin/login/" in response.url
+        assert response.url.startswith("/login/")
 
     def test_role_with_permission_gets_in(self, client, college_a, make_user):
         client.force_login(make_user(college_a, "teacher", roles=[Role.FACULTY]))

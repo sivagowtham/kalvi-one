@@ -142,6 +142,25 @@ def require_perm(code: str) -> Callable:
     return decorator
 
 
+def require_login(view: Callable) -> Callable:
+    """View decorator for pages every signed-in user may open, such as their own password.
+
+    Anyone not signed in is sent to the login page. No permission code is checked, so use
+    this only for pages about the user themselves (D23).
+    """
+
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+
+            return redirect_to_login(request.get_full_path())
+        return view(request, *args, **kwargs)
+
+    wrapped.kalvi_login_only = True
+    return wrapped
+
+
 def public(view: Callable) -> Callable:
     """Mark a view as deliberately open to everyone. The default-deny test requires a mark."""
     view.kalvi_public = True
