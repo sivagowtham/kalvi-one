@@ -1,0 +1,56 @@
+[project]
+name = "kalvione"
+version = "0.1.0"
+description = "KalviOne: a multi-tenant ERP for colleges"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "django[argon2]>=5.2,<5.3",
+    "django-environ>=0.12",
+    "psycopg[binary]>=3.2",
+    "gunicorn>=23.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+    "pytest-cov>=6.0",
+    "factory-boy>=3.3",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["**/migrations/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "DJ",   # django
+    "S",    # bandit (security)
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S106"]  # assert and hard-coded test passwords are fine in tests
+"**/tests/**/*.py" = ["S101", "S106"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["tests", "apps"]
+addopts = "--strict-markers --cov=apps --cov=config --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = ["*/migrations/*", "config/wsgi.py", "config/asgi.py", "config/settings/prod.py", "config/settings/dev.py"]
