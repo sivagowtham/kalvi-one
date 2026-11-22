@@ -101,6 +101,12 @@ LOGIN_LOCKOUT_MINUTES = env.int("LOGIN_LOCKOUT_MINUTES", default=15)
 PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=60 * 60)
 # Reset emails sent to one account per hour, to stop the form being used to flood an inbox.
 PASSWORD_RESET_EMAILS_PER_HOUR = env.int("PASSWORD_RESET_EMAILS_PER_HOUR", default=3)
+# Invite links for a first password last longer than reset links (D25).
+INVITE_LINK_TIMEOUT = env.int("INVITE_LINK_TIMEOUT", default=7 * 24 * 60 * 60)
+# Each college's web address, used in emails sent from admin or a command (D25).
+# {slug} is the college subdomain and {base} the first TENANT_BASE_DOMAINS entry. A dedicated
+# deployment can use a fixed address, e.g. https://erp.yourcollege.in
+COLLEGE_URL_TEMPLATE = env("COLLEGE_URL_TEMPLATE", default="http://{slug}.{base}:8000")
 
 # Email (D24). EMAIL_URL examples: consolemail:// (print to the console, the default),
 # smtp+tls://user:password@smtp.zoho.in:587. See django-environ's email_url.

@@ -119,6 +119,17 @@ class SetPasswordFromLinkView(CollegeContextMixin, auth_views.PasswordResetConfi
 reset_confirm_view = public(SetPasswordFromLinkView.as_view())
 
 
+class AcceptInviteView(SetPasswordFromLinkView):
+    """The link in an invite email: choose a first password (D25)."""
+
+    template_name = "accounts/accept_invite.html"
+    token_generator = links.invite_tokens
+    success_message = "Welcome! Your password is set. Please sign in."
+
+
+invite_accept_view = public(AcceptInviteView.as_view())
+
+
 @require_login
 def home(request):
     """Landing page after login. Modules add their links here as they get their own pages."""

@@ -1,0 +1,1 @@
+Your {% if college %}{{ college.name }} {% endif %}account is ready

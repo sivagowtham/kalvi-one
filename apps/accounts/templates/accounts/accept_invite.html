@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Welcome · {{ block.super }}{% endblock %}
+{% block content %}
+{% if validlink %}
+  <h1>Welcome! Choose your password</h1>
+  <p class="muted">Signing in as <strong>{{ form.user.username }}</strong></p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+      {% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}
+    {% endfor %}
+    <button type="submit" class="full">Save password</button>
+  </form>
+{% else %}
+  <h1>This link no longer works</h1>
+  <p>Invite links work once and expire after a few days. If you already chose a password, sign in. Otherwise ask for a new link, or ask the college office to send a new invite.</p>
+  <p><a class="button" href="{% url 'accounts:login' %}">Sign in</a> &nbsp; <a href="{% url 'accounts:forgot_password' %}">Email me a new link</a></p>
+{% endif %}
+{% endblock %}

@@ -8,3 +8,4 @@ register("accounts.view_roleassignment", [Role.PRINCIPAL, Role.OFFICE], "See rol
 register("accounts.add_roleassignment", [Role.PRINCIPAL], "Give a user a role")
 register("accounts.change_roleassignment", [Role.PRINCIPAL], "Change a role assignment")
 register("accounts.delete_roleassignment", [Role.PRINCIPAL], "Take a role away")
+register("accounts.invite_user", [Role.PRINCIPAL, Role.OFFICE], "Email users an invite link")

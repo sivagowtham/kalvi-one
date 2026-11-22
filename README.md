@@ -20,6 +20,8 @@ Check it is running at http://localhost:8000/health/.
 
 `make seed` creates two fake colleges, "Demo College of Engineering" at http://demo.localhost:8000/ and "Sample College of Arts and Science" at http://sample.localhost:8000/ (sign in at `/login/`; staff can open the admin at `/admin/`). Each gets departments, programmes, courses, the 2026-27 academic year a 2026 batch for each programme with its sections, and fake students with guardians and consent records, placed in semester 1 of the current term, plus seats per quota and fake applications at each admission status, plus one user for every role: `principal@demo.example`, `hod@demo.example`, `faculty@demo.example`, `office@demo.example`, `accounts@demo.example`, `examcell@demo.example`, student `26DCE001` and `parent@demo.example`. The password for all of them is `kalvione-demo-123`. The command is safe to run twice, and it refuses to run in production settings.
 
+Emails (password reset links and invites) are printed to the console in development. To invite every account in a college that has no password yet, run `manage.py send_invites --college demo --as office@demo.example` to count them, then add `--send`.
+
 Each college is served on its own subdomain. With a college whose slug is `demo`, open http://demo.localhost:8000/. Browsers send `*.localhost` to your own machine, so no DNS setup is needed.
 
 ## Tests and lint

@@ -1,9 +1,10 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.forms import AdminPasswordChangeForm, ReadOnlyPasswordHashField
 
 from apps.tenancy.admin import TenantModelAdmin
 
+from . import links
 from .models import RoleAssignment, User
 
 
@@ -61,6 +62,30 @@ class UserAdmin(admin.ModelAdmin):
     list_filter = ["is_active", "is_staff"]
     search_fields = ["username", "full_name", "email"]
     inlines = [RoleAssignmentInline]
+    actions = ["send_invites"]
+
+    def has_invite_permission(self, request) -> bool:
+        return request.user.has_perm("accounts.invite_user")
+
+    @admin.action(
+        description="Send invite email (to set their first password)", permissions=["invite"]
+    )
+    def send_invites(self, request, queryset):
+        sent = skipped = 0
+        for user in queryset:
+            if links.send_invite(user):
+                sent += 1
+            else:
+                skipped += 1
+        if sent:
+            self.message_user(request, f"Sent {sent} invite email(s).", messages.SUCCESS)
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped}: no email address, inactive, or a password is already set "
+                "(they can use “Forgot password?” on the login page).",
+                messages.WARNING,
+            )
 
     def get_queryset(self, request):
         # Users are not a TenantModel (platform staff have no college), so filter here.

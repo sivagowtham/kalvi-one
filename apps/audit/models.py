@@ -42,6 +42,7 @@ class AuditEvent(models.Model):
         VIEW_SENSITIVE = "view_sensitive", "Viewed a sensitive field"
         RESET_REQUESTED = "reset_requested", "Asked for a password reset link"
         PASSWORD_SET = "password_set", "Set a password from an emailed link"
+        INVITE_SENT = "invite_sent", "Sent an invite email"
 
     # Null only for platform-level events (platform staff logins, platform admin work).
     college = models.ForeignKey(

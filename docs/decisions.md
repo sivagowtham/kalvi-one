@@ -34,6 +34,7 @@ How to use this file:
 | D22 | Excel import checks every row before saving anything, then saves all rows in one transaction; the file is never stored | Accepted |
 | D23 | Each college has its own login page; logins pause after repeated wrong passwords, counted from the audit log | Accepted |
 | D24 | Forgotten passwords are reset through a one-time emailed link on the college's own address; the reply never says whether an account exists | Accepted |
+| D25 | New accounts get an invite email with a 7-day link to choose their first password, sent from admin or a command | Accepted |
 
 ---
 
@@ -333,3 +334,17 @@ How to use this file:
   - Excel import now copies the student's email and mobile number to their login, as enrolment already did.
 - **Alternatives:** One-time codes by SMS (costs money per message, and needs a provider and DLT registration in India; it can be added later for students without email); django-allauth (much more than we need, and not college-aware).
 - **Consequences:** People with no email on file must ask the office to add one. Sending happens inside the request, so a slow mail server slows the page; a background queue can come later.
+
+## D25. Invite emails for a first password
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Staff, imported students and enrolled students get accounts with no usable password (D21, D22). The college needs to tell them their account exists and let each one choose a password, without the office handling passwords.
+- **Decision:**
+  - An invite is an email with the username and a link to `/welcome/<id>/<token>/` on the college's address, where the person chooses their first password. It reuses the D24 link page, with its own token salt, so an invite link is never a reset link and the other way round. It lasts `INVITE_LINK_TIMEOUT` (default 7 days) and stops working once a password is set.
+  - Only active accounts with an email address and no usable password can be invited. Anyone who already has a password uses "Forgot password?" instead.
+  - The principal and office (`accounts.invite_user`) send invites from the admin user list ("Send invite email"), or for a whole college with `manage.py send_invites --college SLUG --as USER [--only staff|students|parents] [--send]`. Without `--send` the command only counts.
+  - Each invite is audited as `invite_sent`, with the sender as actor.
+  - Emails sent outside a request build the link from `COLLEGE_URL_TEMPLATE` (for example `https://{slug}.kalvione.in`), so they always point at the college's own address.
+- **Alternatives:** Sending invites automatically on enrolment or import (easy to add later, but colleges may want to check the data first); temporary passwords printed on a slip (they get shared and never changed).
+- **Consequences:** `COLLEGE_URL_TEMPLATE` must be set correctly in each deployment. A large college sends hundreds of emails in one run, so the mail provider's sending limits apply; a background queue can come later.
