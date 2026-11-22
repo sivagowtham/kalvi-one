@@ -78,7 +78,7 @@ How to use this file:
 - **Status:** Accepted
 - **Context:** Student and staff records are personal data under India's Digital Personal Data Protection Act, 2023.
 - **Decision:** No real names, phone numbers, emails, marks or other personal data ever go into the repository, fixtures, seed scripts, screenshots or CI logs. Seed data is generated with Faker.
-- **Consequences:** Real college data is loaded only into deployed environments, through an import process to be designed later.
+- **Consequences:** Real college data is loaded only into deployed environments, through an import process to be designed later. The `seed_demo` command runs only where `ALLOW_DEMO_SEED` is true (dev and test settings, never prod). It uses `.example` email domains and Faker's Indian-English names with a fixed seed, so runs are repeatable.
 
 ## D11. Tooling
 
