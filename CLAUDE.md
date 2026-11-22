@@ -8,3 +8,4 @@
 - Style: ruff with line length 100. Settings come from environment variables via django-environ.
 - Every college-owned model extends `apps.tenancy.models.TenantModel` and gets isolation tests (D4, D12). Treat `all_colleges` and raw SQL as review flags.
 - Every view needs `@require_perm("code")` or `@public` (D7); register new codes in the app's `grants.py`. The default-deny test fails otherwise.
+- Models holding college data mix in `apps.audit.mixins.Audited` (D8). Never bypass it with queryset `update()`/`bulk_*` or raw SQL; use `apps.audit.bulk.audited_update()`.
