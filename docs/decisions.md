@@ -33,6 +33,7 @@ How to use this file:
 | D21 | Admissions use a fixed status flow; enrolment is one transaction that creates the student, login, guardians, consent and first placement | Accepted |
 | D22 | Excel import checks every row before saving anything, then saves all rows in one transaction; the file is never stored | Accepted |
 | D23 | Each college has its own login page; logins pause after repeated wrong passwords, counted from the audit log | Accepted |
+| D24 | Forgotten passwords are reset through a one-time emailed link on the college's own address; the reply never says whether an account exists | Accepted |
 
 ---
 
@@ -316,3 +317,19 @@ How to use this file:
   - A cache-based counter, which would need a shared cache such as Redis in production.
   - Locking a username for everyone, which lets anyone lock a principal out by guessing on purpose. Counting per IP address avoids that, at the cost of letting a guesser who uses many addresses go slower but not stop.
 - **Consequences:** Behind a proxy, `REMOTE_ADDR` must be the visitor's real address, or every visitor shares one count; this is set up at deployment. The check reads the audit table on each login attempt, which the existing indexes cover at current volumes.
+
+## D24. Forgot password and emailed set-password links
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Imported and enrolled students, and new staff, get accounts with no usable password (D21, D22). People also forget passwords. The office should not have to type passwords for hundreds of people.
+- **Decision:**
+  - `/password/forgot/` asks for an email or roll number. It finds an active account in the current college by username, or by email when exactly one account has it. If the account has an email address, it gets a link to `/password/reset/<id>/<token>/` on the same college address. The page always gives the same reply, so it cannot be used to find out who has an account.
+  - The token is Django's reset token with its own salt, also tied to the user's college. It stops working once the password is set, after the person signs in, when their email changes, and after `PASSWORD_RESET_TIMEOUT` (default 1 hour). Django's view moves the token from the address bar into the session before showing the form. The link page looks the user up only in the current college.
+  - The link also works for accounts with no usable password, so it is how imported students set their first password.
+  - At most `PASSWORD_RESET_EMAILS_PER_HOUR` (default 3) reset emails go to one account per hour, counted from the audit log.
+  - The audit log records each request (`reset_requested`, with whether an email was sent and why not) and each password set from a link (`password_set`), next to the usual masked User update. Requests for unknown accounts record the text typed, as failed logins already do.
+  - Email goes through Django's mail API, configured by `EMAIL_URL` (django-environ). The default prints emails to the console. A real provider (for example Zoho Mail SMTP or Amazon SES) is set at deployment.
+  - Excel import now copies the student's email and mobile number to their login, as enrolment already did.
+- **Alternatives:** One-time codes by SMS (costs money per message, and needs a provider and DLT registration in India; it can be added later for students without email); django-allauth (much more than we need, and not college-aware).
+- **Consequences:** People with no email on file must ask the office to add one. Sending happens inside the request, so a slow mail server slows the page; a background queue can come later.

@@ -51,3 +51,23 @@ class LoginForm(ThrottledLoginMixin, AuthenticationForm):
 
 class AdminLoginForm(ThrottledLoginMixin, AdminAuthenticationForm):
     """Django admin's own login form, with the same pause after wrong passwords."""
+
+
+class ForgotPasswordForm(forms.Form):
+    username = forms.CharField(
+        label=_("Email or roll number"),
+        max_length=150,
+        widget=forms.TextInput(attrs={"autocomplete": "username", "autocapitalize": "none"}),
+    )
+
+    def get_user(self, college):
+        """The active account in ``college`` with this username, or else this email if unique."""
+        from .models import User
+
+        value = self.cleaned_data["username"].strip()
+        users = User.objects.filter(college=college, is_active=True)
+        user = users.filter(username=value).first()
+        if user is None and "@" in value:
+            matches = list(users.filter(email__iexact=value)[:2])
+            user = matches[0] if len(matches) == 1 else None
+        return user

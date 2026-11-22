@@ -97,6 +97,16 @@ LOGOUT_REDIRECT_URL = "accounts:login"
 # Wrong passwords for one username from one IP address before logins pause (D23).
 LOGIN_FAILURE_LIMIT = env.int("LOGIN_FAILURE_LIMIT", default=5)
 LOGIN_LOCKOUT_MINUTES = env.int("LOGIN_LOCKOUT_MINUTES", default=15)
+# Emailed "set a new password" links stop working after this many seconds (D24).
+PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=60 * 60)
+# Reset emails sent to one account per hour, to stop the form being used to flood an inbox.
+PASSWORD_RESET_EMAILS_PER_HOUR = env.int("PASSWORD_RESET_EMAILS_PER_HOUR", default=3)
+
+# Email (D24). EMAIL_URL examples: consolemail:// (print to the console, the default),
+# smtp+tls://user:password@smtp.zoho.in:587. See django-environ's email_url.
+EMAIL_CONFIG = env.email_url("EMAIL_URL", default="consolemail://")
+vars().update(EMAIL_CONFIG)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="KalviOne <no-reply@kalvione.in>")
 # Usernames are unique per college, not globally; CollegeBackend handles lookup (D6).
 SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 

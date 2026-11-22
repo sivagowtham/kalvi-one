@@ -377,7 +377,12 @@ def _save(row: dict, college, term: Semester) -> Student:
         student.set_secret("aadhaar", row["aadhaar"])
     student.save()
     login = User.objects.create_user(
-        student.roll_number, None, college=college, full_name=student.display_name
+        student.roll_number,
+        None,
+        college=college,
+        full_name=student.display_name,
+        email=student.email,
+        phone=student.mobile,
     )
     RoleAssignment.objects.create(user=login, role=Role.STUDENT)
     student.user = login

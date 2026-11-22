@@ -2,10 +2,18 @@
 
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.views.generic import FormView, TemplateView
 
-from .forms import LoginForm
+from apps.audit import recorder
+from apps.audit.models import AuditEvent
+
+from . import links
+from .forms import ForgotPasswordForm, LoginForm
+from .models import User
 from .permissions import public, require_login
 
 
@@ -52,6 +60,63 @@ class PasswordChangeView(CollegeContextMixin, auth_views.PasswordChangeView):
 
 
 password_change_view = require_login(PasswordChangeView.as_view())
+
+
+class ForgotPasswordView(CollegeContextMixin, FormView):
+    """Ask for a reset link. The reply is the same whether or not the account exists (D24)."""
+
+    template_name = "accounts/forgot_password.html"
+    form_class = ForgotPasswordForm
+
+    def form_valid(self, form):
+        user = form.get_user(self.request.college)
+        if user is None:
+            recorder.record(
+                AuditEvent.Action.RESET_REQUESTED,
+                extra={"username": form.cleaned_data["username"][:150], "sent": False},
+            )
+        else:
+            links.send_reset_email(self.request, user)
+        return redirect("accounts:forgot_password_sent")
+
+
+forgot_password_view = public(ForgotPasswordView.as_view())
+
+
+class ForgotPasswordSentView(CollegeContextMixin, TemplateView):
+    template_name = "accounts/forgot_password_sent.html"
+
+
+forgot_password_sent_view = public(ForgotPasswordSentView.as_view())
+
+
+class SetPasswordFromLinkView(CollegeContextMixin, auth_views.PasswordResetConfirmView):
+    """Open an emailed link and choose a password. Only this college's users (D6, D24).
+
+    Django's view moves the token out of the address bar into the session before showing
+    the form, so it does not leak through the Referer header.
+    """
+
+    template_name = "accounts/set_password.html"
+    token_generator = links.reset_tokens
+    success_message = "Your new password is set. Please sign in."
+
+    def get_user(self, uidb64):
+        try:
+            pk = int(force_str(urlsafe_base64_decode(uidb64)))
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return User.objects.filter(pk=pk, college=self.request.college, is_active=True).first()
+
+    def form_valid(self, form):
+        form.save()  # the User update event records that the password changed, masked
+        recorder.record(AuditEvent.Action.PASSWORD_SET, instance=self.user, actor=self.user)
+        del self.request.session[auth_views.INTERNAL_RESET_SESSION_TOKEN]
+        messages.success(self.request, self.success_message)
+        return redirect("accounts:login")
+
+
+reset_confirm_view = public(SetPasswordFromLinkView.as_view())
 
 
 @require_login

@@ -105,6 +105,8 @@ def test_import_creates_students_logins_guardians_and_placements(college_a, core
     assert student.mobile == "9123456780"
     assert student.is_first_graduate
     assert student.user.username == "26CSE001" and student.user.roles() == {Role.STUDENT}
+    # The login gets the student's contact details, so reset and invite emails can reach them.
+    assert (student.user.email, student.user.phone) == (student.email, "9123456780")
     assert (placement.semester_number, placement.section) == (1, core_a["be_cse_a"])
     assert [g.is_primary for g in guardians] == [True, False]
     assert str(result).startswith("students.xlsx")
