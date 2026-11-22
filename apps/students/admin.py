@@ -11,9 +11,18 @@ from apps.academics.models import Programme
 from apps.accounts.permissions import has_perm, hod_department_ids
 from apps.tenancy.admin import TenantModelAdmin
 
-from . import promotion
+from . import importer, promotion
 from .admin_tools import PersonForm, SensitiveAdminMixin, sees_sensitive
-from .models import Batch, Consent, Guardian, Section, Student, StudentSemester
+from .models import (
+    Batch,
+    Consent,
+    Guardian,
+    ImportMapping,
+    ImportRun,
+    Section,
+    Student,
+    StudentSemester,
+)
 
 
 @admin.register(Batch)
@@ -233,6 +242,7 @@ STATUS = ("Status", {"fields": [("status", "status_date"), "status_note"]})
 
 @admin.register(Student)
 class StudentAdmin(SensitiveAdminMixin, DepartmentScopedAdmin):
+    change_list_template = "admin/students/student/change_list.html"
     form = StudentForm
     list_display = ["roll_number", "display_name", "batch", "status", "residence"]
     list_filter = ["status", "batch", "residence", "admission_type"]
@@ -259,6 +269,28 @@ class StudentAdmin(SensitiveAdminMixin, DepartmentScopedAdmin):
             readonly += [f for f in fields if f not in editable and f not in readonly]
         return readonly
 
+    def get_urls(self):
+        extra = [
+            path(
+                "import/",
+                self.admin_site.admin_view(lambda r: import_view(self, r)),
+                name="students_student_import",
+            ),
+            path(
+                "import/template/",
+                self.admin_site.admin_view(lambda r: template_view(self, r)),
+                name="students_student_import_template",
+            ),
+        ]
+        return [*extra, *super().get_urls()]
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = {
+            **(extra_context or {}),
+            "can_import": has_perm(request.user, "students.import_students"),
+        }
+        return super().changelist_view(request, extra_context)
+
     def get_inlines(self, request, obj):
         if sees_sensitive(request):
             return self.inlines
@@ -270,6 +302,80 @@ class StudentAdmin(SensitiveAdminMixin, DepartmentScopedAdmin):
 
             kwargs["queryset"] = User.objects.filter(college=request.college)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class ImportForm(forms.Form):
+    file = forms.FileField(help_text="An .xlsx file. It is read once and not kept.")
+    mapping = forms.ModelChoiceField(
+        queryset=ImportMapping.all_colleges.none(),  # set per college below
+        required=False,
+        help_text="A saved layout, for example for an export from another system.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["mapping"].queryset = ImportMapping.objects.all()
+
+
+def import_view(model_admin, request):
+    if not has_perm(request.user, "students.import_students"):
+        raise PermissionDenied
+    run = None
+    form = ImportForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        run = importer.run(
+            request.user,
+            form.cleaned_data["file"],
+            mapping=form.cleaned_data["mapping"],
+            commit="import" in request.POST,
+        )
+        if run.status == ImportRun.Status.IMPORTED:
+            messages.success(request, f"Imported {run.created_count} students.")
+            return redirect(reverse("admin:students_student_changelist"))
+    return TemplateResponse(
+        request,
+        "admin/students/import.html",
+        {
+            **model_admin.admin_site.each_context(request),
+            "title": "Import students from Excel",
+            "form": form,
+            "run": run,
+            "opts": model_admin.model._meta,
+        },
+    )
+
+
+def template_view(model_admin, request):
+    if not has_perm(request.user, "students.import_students"):
+        raise PermissionDenied
+    from django.http import HttpResponse
+
+    response = HttpResponse(
+        importer.template(request.college),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="kalvione-students-template.xlsx"'
+    return response
+
+
+@admin.register(ImportMapping)
+class ImportMappingAdmin(TenantModelAdmin):
+    list_display = ["name"]
+
+
+@admin.register(ImportRun)
+class ImportRunAdmin(TenantModelAdmin):
+    list_display = ["created_at", "file_name", "status", "row_count", "created_count"]
+    list_filter = ["status"]
+
+    def get_readonly_fields(self, request, obj=None):
+        return [f.name for f in self.model._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Consent)

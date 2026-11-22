@@ -591,3 +591,47 @@ class NumberCounter(TenantModel):
 
     def __str__(self) -> str:
         return f"{self.key}: {self.last_value}"
+
+
+class ImportMapping(Audited, TenantModel):
+    """A saved spreadsheet layout, e.g. "Laudea export": header text to KalviOne field (D22)."""
+
+    name = models.CharField(max_length=100)
+    mapping = models.JSONField(
+        default=dict, help_text='Spreadsheet header to field name, e.g. {"Reg No": "roll_number"}.'
+    )
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["college", "name"], name="unique_import_mapping")
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ImportRun(Audited, TenantModel):
+    """A summary of one import attempt. The uploaded file itself is never stored (D22)."""
+
+    class Status(models.TextChoices):
+        CHECKED = "checked", "Checked, nothing saved"
+        IMPORTED = "imported", "Imported"
+        FAILED = "failed", "Failed checks, nothing saved"
+
+    uploaded_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, null=True, related_name="+"
+    )
+    file_name = models.CharField(max_length=200)
+    mapping = models.ForeignKey(ImportMapping, on_delete=models.SET_NULL, null=True, blank=True)
+    row_count = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=10, choices=Status.choices)
+    errors = models.JSONField(default=list, blank=True, help_text="[row, column, message]")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.file_name} ({self.get_status_display()})"

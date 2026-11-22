@@ -31,6 +31,7 @@ How to use this file:
 | D19 | Revealing an encrypted field is audited (adds to D8) | Accepted |
 | D20 | Community, quota and document lists and the roll number pattern are per-college config with Tamil Nadu defaults | Accepted |
 | D21 | Admissions use a fixed status flow; enrolment is one transaction that creates the student, login, guardians, consent and first placement | Accepted |
+| D22 | Excel import checks every row before saving anything, then saves all rows in one transaction; the file is never stored | Accepted |
 
 ---
 
@@ -279,3 +280,21 @@ How to use this file:
   - Applications are never deleted. Rejected, withdrawn and enrolled applications are read-only in admin.
 - **Alternatives:** A workflow library such as django-fsm (another dependency for seven states); creating the student at confirmation (it would leave students for applicants who never join).
 - **Consequences:** The fees module will replace the fee checkbox with a payment check inside `move()`. A public online application form will create applications in draft through the same model. New students need a password set by staff before they can log in.
+
+## D22. Excel import of existing students
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Both colleges hold their current students in spreadsheets or in another ERP (PIE Tech uses Laudea). Office staff need to load hundreds of rows, and a partly loaded file is worse than none.
+- **Decision:**
+  - One fixed set of columns, described in a downloadable template whose second sheet lists the college's allowed values (communities, quotas, programme codes).
+  - Every row is checked first: required values, numbers already used in the college or repeated in the file, community and quota codes, gender, Aadhaar form and duplicates, mobile and PIN code formats, dates, the batch (programme code plus batch year), the section, and a semester number that runs in the current term. Errors are listed by row and column.
+  - If any row fails, nothing is saved. Otherwise all rows are saved in one transaction, one at a time, so the audit log records each student, guardian, login and placement.
+  - Imported students get a student login with no usable password and are placed in the current term. Father and mother become guardians.
+  - No consent record is created on import, because the import cannot prove that consent was given. Consent is recorded afterwards through the student record.
+  - An `ImportMapping` (for example "Laudea export") maps another system's headers to KalviOne fields. Its default is create-only, and an update mode can follow.
+  - The uploaded file is read in memory and never stored. An `ImportRun` keeps only the file name, counts and errors. Files are limited to 5 MB and 5,000 rows.
+  - `manage.py import_students FILE --college SLUG --as USER [--commit]` does the same on a server, for a first data load.
+  - Only the principal and office can import (`students.import_students`).
+- **Alternatives:** Importing the good rows and reporting the bad ones (leaves half-loaded classes to clean up); django-import-export (generic, and harder to make college-aware and to keep sensitive values out of its previews and logs).
+- **Consequences:** Real files are loaded only in deployed environments (D10). Error messages quote cell values, so `ImportRun.errors` can hold a mistyped name or roll number but never an Aadhaar number. Updating existing students from a file needs its own change.

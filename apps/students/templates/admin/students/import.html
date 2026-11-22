@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Import students from Excel</h1>
+<ol>
+  <li><a href="{% url 'admin:students_student_import_template' %}">Download the template</a>. Its second sheet lists the allowed values.</li>
+  <li>Fill one row per student. Students are placed in the current term.</li>
+  <li>Press "Check only" to find problems. Nothing is saved until every row passes.</li>
+  <li>Press "Check and import" to save every row at once.</li>
+</ol>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <p>
+    <input type="submit" name="check" value="Check only">
+    <input type="submit" name="import" class="default" value="Check and import">
+  </p>
+</form>
+{% if run %}
+  {% if run.errors %}
+    <h2>{{ run.errors|length }} problem(s) in {{ run.row_count }} row(s). Nothing was saved.</h2>
+    <table>
+      <thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
+      <tbody>{% for row, column, message in run.errors %}<tr><td>{{ row }}</td><td>{{ column }}</td><td>{{ message }}</td></tr>{% endfor %}</tbody>
+    </table>
+  {% else %}
+    <p class="success">All {{ run.row_count }} row(s) passed. Choose the file again and press "Check and import" to save them.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}
