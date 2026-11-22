@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% if college %}{{ college.name }}{% else %}KalviOne{% endif %}{% endblock %}</title>
+  <style>
+    :root { --bg: #f5f6f8; --card: #fff; --text: #1d2430; --muted: #5b6575; --line: #d9dde3;
+            --accent: #1f5fbf; --accent-text: #fff; --error: #b42318; --ok: #146c43; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #14171c; --card: #1d2128; --text: #e7eaee; --muted: #a3acb9; --line: #343a44;
+              --accent: #5b9bf0; --accent-text: #0d1117; --error: #f18b81; --ok: #6fcf97; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+           background: var(--bg); color: var(--text); }
+    main { max-width: 26rem; margin: 3rem auto; padding: 0 1rem; }
+    main.wide { max-width: 40rem; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; }
+    .brand { color: var(--muted); font-size: .875rem; margin: 0 0 .25rem; }
+    h1 { font-size: 1.375rem; margin: 0 0 1.25rem; }
+    label { display: block; font-weight: 600; margin: 1rem 0 .25rem; }
+    input[type=text], input[type=password], input[type=email] {
+      width: 100%; padding: .625rem .75rem; font: inherit; color: inherit; background: var(--bg);
+      border: 1px solid var(--line); border-radius: 8px; }
+    button, .button { display: inline-block; margin-top: 1.25rem; padding: .625rem 1rem; font: inherit;
+      font-weight: 600; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-text);
+      cursor: pointer; text-decoration: none; }
+    button.full { width: 100%; }
+    button.link { background: none; color: var(--accent); padding: 0; margin: 0; font-weight: 400; }
+    a { color: var(--accent); }
+    .muted, .helptext { color: var(--muted); font-size: .875rem; }
+    .helptext ul { padding-left: 1.25rem; margin: .25rem 0 0; }
+    .errorlist { color: var(--error); list-style: none; padding: 0; margin: .25rem 0; }
+    .messages { list-style: none; padding: 0; margin: 0 0 1rem; }
+    .messages li { padding: .5rem .75rem; border-radius: 8px; border: 1px solid var(--line); }
+    .messages .success { color: var(--ok); }
+    .messages .error { color: var(--error); }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main class="{% block main_class %}{% endblock %}">
+    {% if messages %}
+      <ul class="messages">{% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}</ul>
+    {% endif %}
+    <div class="card">
+      <p class="brand">{% if college %}{{ college.name }}{% else %}KalviOne platform{% endif %}</p>
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</body>
+</html>

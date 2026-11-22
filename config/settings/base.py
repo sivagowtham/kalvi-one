@@ -91,7 +91,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Users belong to one college; login is checked against the request's college (D6).
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = ["apps.accounts.backends.CollegeBackend"]
-LOGIN_URL = "admin:login"
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "home"
+LOGOUT_REDIRECT_URL = "accounts:login"
+# Wrong passwords for one username from one IP address before logins pause (D23).
+LOGIN_FAILURE_LIMIT = env.int("LOGIN_FAILURE_LIMIT", default=5)
+LOGIN_LOCKOUT_MINUTES = env.int("LOGIN_LOCKOUT_MINUTES", default=15)
 # Usernames are unique per college, not globally; CollegeBackend handles lookup (D6).
 SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 

@@ -32,6 +32,7 @@ How to use this file:
 | D20 | Community, quota and document lists and the roll number pattern are per-college config with Tamil Nadu defaults | Accepted |
 | D21 | Admissions use a fixed status flow; enrolment is one transaction that creates the student, login, guardians, consent and first placement | Accepted |
 | D22 | Excel import checks every row before saving anything, then saves all rows in one transaction; the file is never stored | Accepted |
+| D23 | Each college has its own login page; logins pause after repeated wrong passwords, counted from the audit log | Accepted |
 
 ---
 
@@ -298,3 +299,20 @@ How to use this file:
   - Only the principal and office can import (`students.import_students`).
 - **Alternatives:** Importing the good rows and reporting the bad ones (leaves half-loaded classes to clean up); django-import-export (generic, and harder to make college-aware and to keep sensitive values out of its previews and logs).
 - **Consequences:** Real files are loaded only in deployed environments (D10). Error messages quote cell values, so `ImportRun.errors` can hold a mistyped name or roll number but never an Aadhaar number. Updating existing students from a file needs its own change.
+
+## D23. College login page and the pause after wrong passwords
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Until now the only way in was the Django admin login, which students cannot use and which never slows down password guessing. Staff and students need their own sign-in page on their college's address.
+- **Decision:**
+  - `/login/`, `/logout/` (POST only) and `/password/change/` are served on every college host and use `CollegeBackend` (D6), so an account works only on its own college's address. The page shows the college's name. Staff sign in with their email and students with their roll number. `/` is a simple home page that later modules add their links to; staff with `is_staff` also see a link to the admin.
+  - `LOGIN_URL` is now this page, so `@require_perm` sends signed-out visitors here instead of to the admin login.
+  - After `LOGIN_FAILURE_LIMIT` (default 5) wrong passwords for one username from one IP address within `LOGIN_LOCKOUT_MINUTES` (default 15) on one college host, with no successful login in between, further attempts are refused without checking the password. Each refusal is audited as a failed login with reason `too_many_attempts`. Refusals do not extend the pause. The Django admin login form has the same check.
+  - The failure count is read from the audit log's failed-login events (D8), so there is no cache or extra table, and every web process sees the same count.
+  - A third view mark, `@require_login`, is for pages about the signed-in user themselves (their home page, their own password). It checks login but no permission code. The default-deny test (D7) accepts it alongside `@require_perm` and `@public`.
+- **Alternatives:**
+  - django-axes, which is mature but keeps its own tables and is not college-aware.
+  - A cache-based counter, which would need a shared cache such as Redis in production.
+  - Locking a username for everyone, which lets anyone lock a principal out by guessing on purpose. Counting per IP address avoids that, at the cost of letting a guesser who uses many addresses go slower but not stop.
+- **Consequences:** Behind a proxy, `REMOTE_ADDR` must be the visitor's real address, or every visitor shares one count; this is set up at deployment. The check reads the audit table on each login attempt, which the existing indexes cover at current volumes.
