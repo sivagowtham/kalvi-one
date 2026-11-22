@@ -18,3 +18,4 @@ INSTALLED_APPS = [*INSTALLED_APPS, "tests.testapp"]  # noqa: F405
 TENANT_BASE_DOMAINS = ["localhost"]
 TENANT_PLATFORM_HOSTS = ["testserver", "localhost"]
 TENANT_DEDICATED_COLLEGE_SLUG = ""
+ROOT_URLCONF = "tests.urls"

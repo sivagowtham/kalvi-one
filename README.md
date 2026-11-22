@@ -12,6 +12,7 @@ You need Docker, and [uv](https://docs.astral.sh/uv/) if you want to run tests o
 cp .env.example .env
 make up                 # Django on http://localhost:8000 and PostgreSQL on localhost:5432
 make migrate            # in a second terminal
+docker compose run --rm web python manage.py createsuperuser   # platform admin at http://localhost:8000/admin/
 ```
 
 Check it is running at http://localhost:8000/health/.
@@ -34,7 +35,7 @@ make check              # everything CI runs
 | Path | What it holds |
 | --- | --- |
 | `config/` | Settings for dev, test and prod, plus URLs, WSGI and ASGI |
-| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware); accounts, audit and academics follow |
+| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions); audit and academics follow |
 | `tests/testapp/` | Models used only by tests to exercise TenantModel |
 | `tests/` | Project-wide tests |
 | `docs/decisions.md` | Every architecture decision and its reasons |

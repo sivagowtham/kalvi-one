@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     # KalviOne apps
     "apps.core",
     "apps.tenancy",
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
@@ -74,6 +75,13 @@ TENANT_PLATFORM_HOSTS = env.list("TENANT_PLATFORM_HOSTS", default=["localhost", 
 TENANT_DEDICATED_COLLEGE_SLUG = env("TENANT_DEDICATED_COLLEGE_SLUG", default="")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Users belong to one college; login is checked against the request's college (D6).
+AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.CollegeBackend"]
+LOGIN_URL = "admin:login"
+# Usernames are unique per college, not globally; CollegeBackend handles lookup (D6).
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",

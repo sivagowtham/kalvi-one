@@ -6,3 +6,6 @@ class TestAppConfig(AppConfig):
 
     name = "tests.testapp"
     label = "testapp"
+
+    def ready(self) -> None:
+        from . import grants  # noqa: F401
