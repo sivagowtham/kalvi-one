@@ -43,3 +43,7 @@ register("fees.view_receiptline", READERS, "See the fee heads a receipt paid")
 
 # Reports (D30): everyone who can see dues can see the reports and download them.
 register("fees.view_reports", READERS, "See and download dues and collection reports")
+
+# The daily Tally file (D31).
+register("fees.export_tally", SETUP, "Create and download Tally files of receipts")
+register("fees.view_tallyexport", SETUP, "See which Tally files were made")

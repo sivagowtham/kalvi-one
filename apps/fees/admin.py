@@ -19,6 +19,7 @@ from .models import (
     Receipt,
     ReceiptLine,
     StudentDue,
+    TallyExport,
 )
 
 
@@ -309,6 +310,8 @@ class ReceiptAdmin(TenantModelAdmin):
         "cancel_reason",
         "cancelled_by",
         "cancelled_at",
+        "tally_export",
+        "tally_cancel_export",
     ]
     fields = readonly_fields
     inlines = [ReceiptLineInline]
@@ -325,3 +328,21 @@ class ReceiptAdmin(TenantModelAdmin):
     @admin.display(description="Print")
     def open(self, obj):
         return format_html('<a href="{}">Open</a>', reverse("fees:receipt", args=[obj.pk]))
+
+
+@admin.register(TallyExport)
+class TallyExportAdmin(TenantModelAdmin):
+    """Read-only record of each Tally file; files are made on the Tally page (D31)."""
+
+    list_display = ["created_at", "up_to", "receipts", "cancellations", "total", "created_by"]
+    readonly_fields = ["up_to", "receipts", "cancellations", "total", "created_by", "created_at"]
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

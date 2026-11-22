@@ -6,7 +6,8 @@ from decimal import Decimal
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -14,8 +15,17 @@ from apps.academics.models import AcademicYear
 from apps.accounts.permissions import has_perm, require_perm
 from apps.students.models import Batch, Student
 
-from . import receipts, reports
-from .models import ZERO, FeeHead, PaymentAccount, PaymentMode, Receipt, StudentDue
+from . import config as fee_config
+from . import receipts, reports, tally
+from .models import (
+    ZERO,
+    FeeHead,
+    PaymentAccount,
+    PaymentMode,
+    Receipt,
+    StudentDue,
+    TallyExport,
+)
 from .words import rupees_in_words
 
 
@@ -320,4 +330,55 @@ def collections_report(request):
         request,
         "fees/collections_report.html",
         _college(request) | {"form": form, "result": result, "query": request.GET.urlencode()},
+    )
+
+
+def _xml_download(content: bytes, filename: str) -> HttpResponse:
+    response = HttpResponse(content, content_type="application/xml; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@require_perm("fees.export_tally")
+def tally_home(request):
+    today = timezone.localdate()
+    receipts_due, cancellations_due = tally.pending(today)
+    if request.method == "POST":
+        try:
+            export = tally.create_export(request.user, today)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            messages.success(
+                request,
+                f"Tally file made with {export.receipts} receipt(s) and "
+                f"{export.cancellations} cancellation(s). Download it below.",
+            )
+        return redirect("fees:tally")
+    return render(
+        request,
+        "fees/tally.html",
+        _college(request)
+        | {
+            "today": today,
+            "pending_receipts": receipts_due.count(),
+            "pending_total": receipts_due.aggregate(total=Sum("amount"))["total"] or ZERO,
+            "pending_cancellations": cancellations_due.count(),
+            "exports": TallyExport.objects.select_related("created_by")[:30],
+            "company": fee_config.setting(request.college, "tally_company"),
+        },
+    )
+
+
+@require_perm("fees.export_tally")
+def tally_download(request, pk):
+    export = get_object_or_404(TallyExport, pk=pk)
+    name = f"tally-receipts-{request.college.code}-{export.up_to:%Y-%m-%d}-{export.pk}.xml"
+    return _xml_download(tally.build_file(export), name.lower())
+
+
+@require_perm("fees.export_tally")
+def tally_ledgers(request):
+    return _xml_download(
+        tally.ledger_file(request.college), f"tally-ledgers-{request.college.code}.xml".lower()
     )

@@ -143,5 +143,6 @@ def home(request):
             "can_open_admin": user.is_staff,
             "can_collect_fees": user.has_perm("fees.collect"),
             "can_see_fee_reports": user.has_perm("fees.view_reports"),
+            "can_export_tally": user.has_perm("fees.export_tally"),
         },
     )

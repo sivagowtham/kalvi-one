@@ -418,6 +418,25 @@ class PaymentMode(models.TextChoices):
     DD = "dd", "Demand draft"
 
 
+class TallyExport(Audited, TenantModel):
+    """One Tally file: the receipts and cancellations it carried, so none is sent twice (D31)."""
+
+    up_to = models.DateField(help_text="Receipts dated up to and including this day.")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", editable=False
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    receipts = models.PositiveIntegerField(default=0)
+    cancellations = models.PositiveIntegerField(default=0)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Tally file up to {self.up_to:%d %b %Y} ({self.receipts} receipts)"
+
+
 class Receipt(Audited, TenantModel):
     """Money received from one student at one time (D29). Never deleted, only cancelled."""
 
@@ -453,6 +472,22 @@ class Receipt(Audited, TenantModel):
     )
     cancelled_at = models.DateTimeField(null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    tally_export = models.ForeignKey(
+        TallyExport,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="sent_receipts",
+    )
+    tally_cancel_export = models.ForeignKey(
+        TallyExport,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="sent_cancellations",
+    )
 
     class Meta:
         ordering = ["-date", "-number"]

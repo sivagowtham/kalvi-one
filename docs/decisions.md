@@ -40,6 +40,7 @@ How to use this file:
 | D28 | Dues are raised per student, head and instalment; concessions count once the principal approves, split into college and government shares | Accepted |
 | D29 | Receipts are taken on a phone-first counter page, settle the oldest dues first, are numbered per financial year and are cancelled, never deleted | Accepted |
 | D30 | Dues and collection reports are phone-friendly pages with Excel downloads; the admissions fee tick box stays for now | Accepted |
+| D31 | The Tally file holds each receipt once, as a Receipt voucher in Tally's own import XML; cancellations follow as Cancel vouchers | Accepted |
 
 ---
 
@@ -431,3 +432,17 @@ How to use this file:
   - The admissions "fee paid" tick box stays. Applicants pay before they are students, and receipts belong to students (D29), so a real check needs receipts for applicants. That is left until colleges say how they take admission fees.
 - **Alternatives:** Stored daily totals (faster at large scale, but one more thing to keep right); a report builder (too much for the first version, and the AI questions in step 6 cover ad hoc needs).
 - **Consequences:** D21's note that the fees module will replace the tick box is postponed, not dropped.
+
+## D31. The daily Tally file
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (Gowtham chose a daily file first; D26)
+- **Context:** The accountant imports fee receipts into Tally Prime or Tally ERP 9 once a day. A receipt typed twice, or missed, breaks the books, and Tally's own XML import is the one format both versions read.
+- **Decision:**
+  - `/fees/tally/` (principal and accounts, `fees.export_tally`) shows how many receipts and cancellations have not been sent, and makes a file of all of them up to today. A `TallyExport` row records each file, and each receipt points at the file that carried it (`tally_export`) and, once cancelled, the file that carried the cancellation (`tally_cancel_export`). So a receipt is sent once, and any earlier file can be downloaded again with exactly the same vouchers.
+  - Each receipt is a Receipt voucher (the type name is `tally_voucher_type` in config, default "Receipt") with the receipt number as voucher number, the payment reference, and a narration of receipt number, roll number, name and payment mode. No encrypted or sensitive field ever goes in. The cash or bank ledger is debited with the total. Each fee head's ledger is credited with its taxable value, and CGST and SGST go to the ledgers named in config. The file is refused if any voucher does not add up.
+  - A voucher carries `REMOTEID` `kalvione-<college code>-receipt-<id>` for a later live sync. A cancellation is a voucher with `ACTION="Cancel"` that names the date, type and voucher number, as Tally's integration guide shows. A receipt cancelled before it was ever sent is never sent at all.
+  - `/fees/tally/ledgers.xml` lists every ledger the vouchers use, under the Tally groups in config (fees under Direct Incomes, cash under Cash-in-Hand, banks under Bank Accounts, and GST ledgers under Duties & Taxes with their duty head). The accountant imports it once to create missing ledgers. Tally leaves existing ones as they are.
+  - The file names the Tally company when `tally_company` is set, so Tally refuses it if the wrong company is open.
+- **Alternatives:** One file per calendar day with no record of what was sent (a lost or repeated download would miss or double receipts); Tally's ODBC or HTTP port (needs Tally running and reachable from our server; the later phase); a CSV with a Tally add-on (one more tool for each college to install).
+- **Consequences:** In Tally, the receipt voucher type should use manual numbering so KalviOne's numbers are kept, and ledger names must match exactly. Bank allocation details (instrument numbers per bank entry) are not sent yet; the reference is in the narration and the reference field.

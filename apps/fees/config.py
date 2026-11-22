@@ -10,6 +10,16 @@ from typing import Any
 DEFAULTS: dict[str, Any] = {
     # The Tally company the daily file is meant for, shown to the accountant as a check.
     "tally_company": "",
+    # The Tally voucher type receipts are imported as. Its numbering in Tally should be
+    # manual, so Tally keeps KalviOne's receipt numbers.
+    "tally_voucher_type": "Receipt",
+    # Tally groups for the ledger list file, so missing ledgers are created in the right place.
+    "tally_groups": {
+        "fee": "Direct Incomes",
+        "cash": "Cash-in-Hand",
+        "bank": "Bank Accounts",
+        "gst": "Duties & Taxes",
+    },
     # Ledgers that collect GST on taxable fee heads. Fees inside Tamil Nadu are intra-state,
     # so tax is split into CGST and SGST.
     "gst_ledgers": {"cgst": "Output CGST", "sgst": "Output SGST"},
