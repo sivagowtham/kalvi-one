@@ -396,6 +396,10 @@ class StudentDue(Audited, TenantModel):
         return self.student.scope_department_id if self.student_id else None
 
     @property
+    def reduction(self) -> Decimal:
+        return self.waived + self.govt_share
+
+    @property
     def payable(self) -> Decimal:
         """What the student has to pay, before any payment."""
         return self.amount - self.waived - self.govt_share
@@ -403,3 +407,101 @@ class StudentDue(Audited, TenantModel):
     @property
     def balance(self) -> Decimal:
         return self.payable - self.paid
+
+
+class PaymentMode(models.TextChoices):
+    CASH = "cash", "Cash"
+    UPI = "upi", "UPI"
+    CARD = "card", "Card"
+    BANK_TRANSFER = "bank_transfer", "Bank transfer (NEFT, RTGS, IMPS)"
+    CHEQUE = "cheque", "Cheque"
+    DD = "dd", "Demand draft"
+
+
+class Receipt(Audited, TenantModel):
+    """Money received from one student at one time (D29). Never deleted, only cancelled."""
+
+    class Status(models.TextChoices):
+        VALID = "valid", "Valid"
+        CANCELLED = "cancelled", "Cancelled"
+
+    number = models.CharField(max_length=40, editable=False)
+    financial_year = models.CharField(max_length=7, editable=False)
+    date = models.DateField(editable=False)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="receipts")
+    account = models.ForeignKey(PaymentAccount, on_delete=models.PROTECT, related_name="receipts")
+    mode = models.CharField(max_length=14, choices=PaymentMode.choices)
+    reference = models.CharField(
+        max_length=60, blank=True, help_text="UPI transaction ID, cheque or DD number, and so on."
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    notes = models.CharField(max_length=200, blank=True)
+    received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", editable=False
+    )
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.VALID, editable=False
+    )
+    cancel_reason = models.CharField(max_length=200, blank=True, editable=False)
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        editable=False,
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-number"]
+        constraints = [
+            models.UniqueConstraint(fields=["college", "number"], name="unique_receipt_number"),
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name="receipt_positive"),
+            models.CheckConstraint(
+                condition=models.Q(mode="cash") | ~models.Q(reference=""),
+                name="receipt_reference_unless_cash",
+            ),
+        ]
+        indexes = [models.Index(fields=["college", "date", "status"])]
+
+    def __str__(self) -> str:
+        return self.number
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.status == self.Status.CANCELLED
+
+
+class ReceiptLine(Audited, TenantModel):
+    """The part of a receipt that pays one student due, with its GST split if taxable."""
+
+    receipt = models.ForeignKey(Receipt, on_delete=models.PROTECT, related_name="lines")
+    due = models.ForeignKey(StudentDue, on_delete=models.PROTECT, related_name="receipt_lines")
+    head = models.ForeignKey(FeeHead, on_delete=models.PROTECT, related_name="+")
+    instalment_label = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    gst_rate = models.DecimalField(max_digits=4, decimal_places=2, default=ZERO)
+    taxable_value = models.DecimalField(max_digits=10, decimal_places=2)
+    cgst = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
+    sgst = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
+
+    class Meta:
+        ordering = ["receipt", "pk"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name="receipt_line_positive"),
+            models.CheckConstraint(
+                condition=models.Q(
+                    amount=models.F("taxable_value") + models.F("cgst") + models.F("sgst")
+                ),
+                name="receipt_line_gst_adds_up",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.receipt} {self.head} {self.amount}"
+
+    @property
+    def gst_amount(self) -> Decimal:
+        return self.cgst + self.sgst

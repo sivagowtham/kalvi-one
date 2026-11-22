@@ -36,7 +36,13 @@ def next_number(college, pattern_key: str, taken, **values) -> str:
     The counter row is locked for the rest of the transaction, so two people enrolling at
     the same time never get the same number.
     """
-    pattern = config.setting(college, pattern_key)
+    return next_number_for_pattern(
+        config.setting(college, pattern_key), pattern_key, taken, **values
+    )
+
+
+def next_number_for_pattern(pattern: str, pattern_key: str, taken, **values) -> str:
+    """Like next_number, for a pattern another module keeps in its own config."""
     prefix, seq_format, suffix = _split(pattern, **values)
     key = f"{pattern_key}:{prefix}|{suffix}"[:50]
     with transaction.atomic():

@@ -34,3 +34,9 @@ register("fees.view_studentdue", READERS, "See student dues")
 register("fees.raise_dues", SETUP, "Raise a batch's dues from its fee structure")
 # Dues are never added, changed or deleted by hand: they come from the structure, concessions
 # and receipts.
+
+# Receipts (D29): the accounts office takes payments; only the principal cancels.
+register("fees.view_receipt", READERS, "See and print fee receipts")
+register("fees.collect", SETUP, "Take fee payments and issue receipts")
+register("fees.cancel_receipt", [Role.PRINCIPAL], "Cancel a fee receipt")
+register("fees.view_receiptline", READERS, "See the fee heads a receipt paid")

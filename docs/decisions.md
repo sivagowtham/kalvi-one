@@ -38,6 +38,7 @@ How to use this file:
 | D26 | Fees is the second domain module; Tally gets a daily XML file of receipt vouchers first, live sync later | Accepted |
 | D27 | Fee heads carry their Tally ledger and GST rate; a fee structure is one batch's year, split into instalments | Accepted |
 | D28 | Dues are raised per student, head and instalment; concessions count once the principal approves, split into college and government shares | Accepted |
+| D29 | Receipts are taken on a phone-first counter page, settle the oldest dues first, are numbered per financial year and are cancelled, never deleted | Accepted |
 
 ---
 
@@ -396,3 +397,21 @@ How to use this file:
   - Dues cannot be added, changed or deleted by hand in the admin. Concessions are never deleted; they are rejected or withdrawn.
 - **Alternatives:** Working dues out on the fly from structures and concessions every time (simple to store, but slow for reports and it would change old dues when a structure is edited); one due row per student per instalment with heads in JSON (harder to post per head to Tally).
 - **Consequences:** Changing a structure after dues are raised does not change those dues; that needs a correction tool, to be added when accountants ask. The government share is the basis for a "receivable from government" report in step 4.
+
+## D29. Receipts on a phone-first counter page
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Most accounts staff work from a phone (Gowtham, 2026-11-22). They need to find a student, see what is owed, take cash, UPI, card, bank transfer, cheque or DD, and hand over or share a receipt, all on a small screen. Receipt numbers must never repeat, and the Tally file (step 5) needs fee head amounts and GST per receipt.
+- **Decision:**
+  - The fee counter has its own pages outside the admin, using the shared base template: `/fees/collect/` (search by roll number or name; one match opens straight away), `/fees/collect/<student>/` (dues per instalment, then the payment form), `/fees/receipts/<id>/` (the printable receipt, which also saves as PDF from the phone's print menu) and `/fees/receipts/<id>/cancel/`. The home page links to the counter for users who may collect.
+  - `fees.collect` (principal and accounts) takes payments; `fees.view_receipt` (also office and HODs) opens and prints receipts; `fees.cancel_receipt` is the principal's alone.
+  - `receipts.collect()` locks the student's dues, refuses more than is owed (no advance payments yet), and settles the oldest dues first: by due date, then instalment, then the fee head's print order. Each `ReceiptLine` points at the due it paid.
+  - Cash goes to a cash account and every other mode to a bank account. Every mode except cash needs a reference number, which the database also checks.
+  - Numbers come from `College.config["fees"]["receipt_number_pattern"]` (default `{code}/{fy}/{seq:06}`, for example `PIE/2026-27/000123`), with a separate counter per financial year. The financial year starts in the configured month (April). The students module's locked `NumberCounter` is reused, so two counters never get the same number.
+  - The receipt date is always the day it is saved. Backdated receipts are not allowed, so the daily Tally file for a day can only gain receipts on that day.
+  - Fee amounts include GST. On a taxable head the line keeps the taxable value, CGST and SGST, rounded to the paisa, and the database checks that they add up to the amount.
+  - Receipts are never deleted or edited. Cancelling needs a reason, puts each line's amount back on its due, and keeps the receipt marked as cancelled.
+  - Amounts are shown with Indian digit grouping (1,23,456.00), and in words with lakh and crore.
+- **Alternatives:** Taking payments inside the Django admin (unusable on a phone); letting the cashier choose which dues to pay (more taps, and more mistakes at a busy counter; can be added later); a separate receipt number table (the existing locked counter already does this).
+- **Consequences:** A student who overpays or wants to pay in advance cannot yet; refunds and advances need their own change. Sharing on WhatsApp is done by saving the receipt as a PDF from the phone for now.

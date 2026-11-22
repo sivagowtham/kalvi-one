@@ -1,0 +1,22 @@
+.list { list-style: none; padding: 0; margin: 1rem 0 0; }
+.list li { border-top: 1px solid var(--line); padding: .75rem 0; }
+.list a { display: block; text-decoration: none; }
+.amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.right { text-align: right; }
+table { width: 100%; border-collapse: collapse; margin: .5rem 0; }
+th, td { padding: .375rem .25rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { text-align: left; font-size: .875rem; color: var(--muted); font-weight: 600; }
+.instalment { margin-top: 1rem; }
+.instalment h2 { font-size: 1rem; margin: 0; }
+.total { font-size: 1.25rem; font-weight: 700; }
+.stamp { color: var(--error); font-weight: 700; border: 2px solid var(--error); border-radius: 8px;
+         padding: .25rem .5rem; display: inline-block; }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.actions .button, .actions button { flex: 1 1 10rem; text-align: center; }
+.secondary { background: var(--bg) !important; color: var(--accent) !important; border: 1px solid var(--line) !important; }
+@media print {
+  body { background: #fff; color: #000; }
+  main { margin: 0; max-width: none; }
+  .card { border: 0; padding: 0; }
+  .no-print, .messages { display: none !important; }
+}

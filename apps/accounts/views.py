@@ -141,5 +141,6 @@ def home(request):
             "college": request.college,
             "roles": sorted(role.label for role in user.roles()),
             "can_open_admin": user.is_staff,
+            "can_collect_fees": user.has_perm("fees.collect"),
         },
     )

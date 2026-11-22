@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.urls import reverse
+from django.utils.html import format_html
 
 from apps.accounts.permissions import has_perm
 from apps.students import config as student_config
@@ -14,6 +16,8 @@ from .models import (
     FeeStructureLine,
     Instalment,
     PaymentAccount,
+    Receipt,
+    ReceiptLine,
     StudentDue,
 )
 
@@ -266,3 +270,58 @@ class StudentDueAdmin(TenantModelAdmin):
     @admin.display(description="Balance")
     def balance(self, obj):
         return obj.balance
+
+
+class ReceiptLineInline(admin.TabularInline):
+    model = ReceiptLine
+    extra = 0
+    fields = ["head", "instalment_label", "amount", "gst_rate", "taxable_value", "cgst", "sgst"]
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Receipt)
+class ReceiptAdmin(TenantModelAdmin):
+    """Read-only: receipts are taken and cancelled on the fee counter pages (D29)."""
+
+    list_display = ["number", "date", "student", "amount", "mode", "account", "status", "open"]
+    list_filter = ["status", "mode", "account", "financial_year", "date"]
+    search_fields = ["number", "student__roll_number", "student__name", "reference"]
+    list_select_related = ["student", "account"]
+    date_hierarchy = "date"
+    readonly_fields = [
+        "number",
+        "date",
+        "student",
+        "account",
+        "mode",
+        "reference",
+        "amount",
+        "notes",
+        "received_by",
+        "status",
+        "cancel_reason",
+        "cancelled_by",
+        "cancelled_at",
+    ]
+    fields = readonly_fields
+    inlines = [ReceiptLineInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Print")
+    def open(self, obj):
+        return format_html('<a href="{}">Open</a>', reverse("fees:receipt", args=[obj.pk]))
