@@ -1,11 +1,21 @@
 from django import forms
-from django.contrib import admin
-from django.core.exceptions import ValidationError
+from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied, ValidationError
 
+from apps.accounts.permissions import has_perm
 from apps.students import config as student_config
 from apps.tenancy.admin import TenantModelAdmin
 
-from .models import FeeHead, FeeStructure, FeeStructureLine, Instalment, PaymentAccount
+from . import config, dues
+from .models import (
+    Concession,
+    FeeHead,
+    FeeStructure,
+    FeeStructureLine,
+    Instalment,
+    PaymentAccount,
+    StudentDue,
+)
 
 
 @admin.register(FeeHead)
@@ -93,6 +103,7 @@ class FeeStructureAdmin(TenantModelAdmin):
     list_select_related = ["batch__programme", "batch__admission_year", "academic_year"]
     fields = ["batch", "academic_year", "quota", "residence", "notes", "is_active"]
     inlines = [InstalmentInline, LineInline]
+    actions = ["raise_dues"]
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         form = super().get_form(request, obj, change, **kwargs)
@@ -111,3 +122,147 @@ class FeeStructureAdmin(TenantModelAdmin):
     @admin.display(description="Total (₹)")
     def total(self, obj):
         return f"{obj.total():,.2f}"
+
+    def has_raise_dues_permission(self, request):
+        return has_perm(request.user, "fees.raise_dues")
+
+    @admin.action(
+        description="Raise dues for the students of these structures", permissions=["raise_dues"]
+    )
+    def raise_dues(self, request, queryset):
+        done = set()
+        for structure in queryset.select_related("batch", "academic_year"):
+            key = (structure.batch_id, structure.academic_year_id)
+            if key in done:
+                continue
+            done.add(key)
+            result = dues.raise_dues(structure.batch, structure.academic_year)
+            self.message_user(
+                request,
+                f"{structure.batch} {structure.academic_year}: {result.created} dues raised for "
+                f"{result.students} student(s).",
+            )
+            if result.skipped:
+                self.message_user(
+                    request, "Not raised: " + "; ".join(result.skipped), messages.WARNING
+                )
+
+
+class ConcessionForm(forms.ModelForm):
+    class Meta:
+        model = Concession
+        fields = []
+
+    def __init__(self, *args, college=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if college is not None and "kind" in self.fields:
+            self.fields["kind"] = forms.ChoiceField(
+                label="Type",
+                choices=[
+                    (code, f"{label} ({'government' if funder == 'government' else 'college'})")
+                    for code, (label, funder) in config.concession_types(college).items()
+                ],
+            )
+
+
+@admin.register(Concession)
+class ConcessionAdmin(TenantModelAdmin):
+    """Concessions are entered by the office and count only once the principal approves."""
+
+    form = ConcessionForm
+    list_display = [
+        "student",
+        "academic_year",
+        "kind",
+        "funded_by",
+        "head",
+        "percent",
+        "amount",
+        "status",
+    ]
+    list_filter = ["status", "funded_by", "kind", "academic_year"]
+    search_fields = ["student__roll_number", "student__name", "reason"]
+    list_select_related = ["student", "academic_year", "head"]
+    autocomplete_fields = ["student"]
+    fields = ["student", "academic_year", "kind", "head", "percent", "amount", "reason"]
+    actions = ["approve", "reject", "withdraw"]
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super().get_form(request, obj, change, **kwargs)
+        college = request.college
+
+        class BoundForm(form):
+            def __init__(self, *args, **kw):
+                super().__init__(*args, college=college, **kw)
+
+        return BoundForm
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj is not None and obj.status != Concession.Status.PENDING:
+            return [*self.fields, "status", "decided_by", "decided_at"]
+        return []
+
+    def has_approve_permission(self, request):
+        return has_perm(request.user, "fees.approve_concession")
+
+    def _decide(self, request, queryset, decide, verb):
+        if not self.has_approve_permission(request):
+            raise PermissionDenied
+        done = 0
+        for concession in queryset.select_related("student", "academic_year"):
+            try:
+                warnings = decide(concession, request.user)
+            except ValidationError as error:
+                self.message_user(request, f"{concession}: {error.messages[0]}", messages.ERROR)
+                continue
+            done += 1
+            for warning in warnings:
+                self.message_user(request, warning, messages.WARNING)
+        if done:
+            self.message_user(request, f"{verb}: {done} concession(s).")
+
+    @admin.action(description="Approve the selected concessions", permissions=["approve"])
+    def approve(self, request, queryset):
+        self._decide(request, queryset, dues.approve, "Approved")
+
+    @admin.action(description="Reject the selected concessions", permissions=["approve"])
+    def reject(self, request, queryset):
+        self._decide(request, queryset, dues.reject, "Rejected")
+
+    @admin.action(description="Withdraw the selected approved concessions", permissions=["approve"])
+    def withdraw(self, request, queryset):
+        self._decide(request, queryset, dues.withdraw, "Withdrawn")
+
+
+@admin.register(StudentDue)
+class StudentDueAdmin(TenantModelAdmin):
+    """Read-only: dues come from fee structures, concessions and receipts."""
+
+    list_display = [
+        "student",
+        "instalment_label",
+        "head",
+        "due_date",
+        "amount",
+        "waived",
+        "govt_share",
+        "paid",
+        "balance",
+    ]
+    list_filter = ["academic_year", "student__batch", "head", "instalment_number"]
+    search_fields = ["student__roll_number", "student__name"]
+    list_select_related = ["student", "head"]
+    date_hierarchy = "due_date"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Balance")
+    def balance(self, obj):
+        return obj.balance

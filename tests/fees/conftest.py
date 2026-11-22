@@ -66,3 +66,28 @@ def accountant(college_a, make_user):
 @pytest.fixture
 def office(college_a, make_user):
     return make_user(college_a, "office", roles=[Role.OFFICE])
+
+
+@pytest.fixture
+def make_student():
+    """make_student(core, "26CSE001", batch_key="be_cse_batch", **fields)"""
+    from apps.students.models import Student
+
+    def _make(core, roll, *, batch_key="be_cse_batch", **fields):
+        batch = core[batch_key]
+        defaults = {
+            "admission_number": f"ADM{roll}",
+            "name": f"Student {roll}",
+            "gender": "female",
+            "community": "BC",
+            "quota": "GOVT",
+        }
+        with college_context(batch.college):
+            return Student.objects.create(batch=batch, roll_number=roll, **(defaults | fields))
+
+    return _make
+
+
+@pytest.fixture
+def principal(college_a, make_user):
+    return make_user(college_a, "principal", roles=[Role.PRINCIPAL])

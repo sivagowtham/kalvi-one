@@ -15,6 +15,7 @@ from apps.accounts.models import RoleAssignment, User
 from apps.accounts.roles import STAFF_ROLES, Role
 from apps.admissions.models import Application, Intake
 from apps.audit.context import audit_context
+from apps.fees.dues import raise_dues
 from apps.fees.models import FeeHead, FeeStructure, FeeStructureLine, Instalment, PaymentAccount
 from apps.students.fakes import fake_aadhaar
 from apps.students.models import (
@@ -280,19 +281,20 @@ class Command(BaseCommand):
             structure, created = FeeStructure.objects.get_or_create(
                 batch=batch, academic_year=year, quota="", residence=""
             )
-            if not created:
-                continue
-            for number, label, due in FEE_INSTALMENTS:
-                Instalment.objects.create(
-                    structure=structure, number=number, label=label, due_date=due
-                )
-            for number, code, amount in FEE_LINES:
-                FeeStructureLine.objects.create(
-                    structure=structure,
-                    instalment_number=number,
-                    head=heads[code],
-                    amount=Decimal(amount),
-                )
+            if created:
+                self._fill_structure(structure, heads)
+            raise_dues(batch, year)
+
+    def _fill_structure(self, structure, heads) -> None:
+        for number, label, due in FEE_INSTALMENTS:
+            Instalment.objects.create(structure=structure, number=number, label=label, due_date=due)
+        for number, code, amount in FEE_LINES:
+            FeeStructureLine.objects.create(
+                structure=structure,
+                instalment_number=number,
+                head=heads[code],
+                amount=Decimal(amount),
+            )
 
     def _seed_admissions(self, spec: CollegeSpec, fake, programmes, year) -> None:
         """Seats per quota and a few fake applications at each status (D10, D21)."""

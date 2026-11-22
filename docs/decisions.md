@@ -37,6 +37,7 @@ How to use this file:
 | D25 | New accounts get an invite email with a 7-day link to choose their first password, sent from admin or a command | Accepted |
 | D26 | Fees is the second domain module; Tally gets a daily XML file of receipt vouchers first, live sync later | Accepted |
 | D27 | Fee heads carry their Tally ledger and GST rate; a fee structure is one batch's year, split into instalments | Accepted |
+| D28 | Dues are raised per student, head and instalment; concessions count once the principal approves, split into college and government shares | Accepted |
 
 ---
 
@@ -381,3 +382,17 @@ How to use this file:
   - The principal and accounts set up fees; office staff and HODs can only see them. Fee heads in use cannot be deleted.
 - **Alternatives:** One amount per head per year with no instalments (does not match how colleges collect); a structure per student (too much data entry); fee heads as a config list instead of rows (receipts and Tally need a stable row to point at).
 - **Consequences:** Next year's fees are a new structure, so old receipts always point at the amounts that applied then. Copying a structure to a new year can be added when the accountants ask for it.
+
+## D28. Student dues and concessions
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Students owe different amounts once scholarships and concessions are taken off. Tamil Nadu has several government scholarships (Post-Matric for SC, SCA and ST students, first graduate, the 7.5% government school scheme, and BC, MBC and DNC scholarships) that the student does not pay but the college must still collect from the government. Colleges also give their own concessions (merit, staff ward, sports, management).
+- **Decision:**
+  - `StudentDue` is one row per student, fee head and instalment for an academic year, copied from the student's fee structure with its label and due date. It keeps the amount, `waived` (the college's concession), `govt_share` (expected from a government scholarship) and `paid`. What the student pays is amount minus waived minus the government share, and the database refuses a row where those and `paid` add up to more than the amount.
+  - Dues are raised for a whole batch from the fee structure list ("Raise dues"), by the principal or accounts. It picks each studying student's most specific structure (quota first, then residence), skips students no structure fits and lists them, and never changes dues that already exist, so it can be run again for students who join late.
+  - `Concession` belongs to a student and an academic year. Its type comes from `College.config["fees"]["concession_types"]` (Tamil Nadu defaults), and each type says whether the government or the college pays. That is copied onto the concession, so a later config change does not rewrite history. A concession is a percentage (of one head or all heads) or a fixed amount for one head, taken from the earliest instalments first.
+  - Office and accounts enter concessions; only the principal approves, rejects or withdraws them. Only approved concessions count. Each decision works the shares out again from scratch, and a due is never reduced below what has been paid on it. What no longer fits is shown as a warning, because it needs a refund or an adjustment by hand.
+  - Dues cannot be added, changed or deleted by hand in the admin. Concessions are never deleted; they are rejected or withdrawn.
+- **Alternatives:** Working dues out on the fly from structures and concessions every time (simple to store, but slow for reports and it would change old dues when a structure is edited); one due row per student per instalment with heads in JSON (harder to post per head to Tally).
+- **Consequences:** Changing a structure after dues are raised does not change those dues; that needs a correction tool, to be added when accountants ask. The government share is the basis for a "receivable from government" report in step 4.

@@ -1,10 +1,11 @@
-"""Fees: fee heads, payment accounts and fee structures (D26, D27).
+"""Fees: set-up (D27), concessions and student dues (D28).
 
 Fees depends on students and academics, never the reverse.
 """
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -12,9 +13,11 @@ from django.db import models
 from apps.academics.models import AcademicYear
 from apps.audit.mixins import Audited
 from apps.students import config as student_config
-from apps.students.models import Batch, Residence
+from apps.students.models import Batch, Residence, Student
 from apps.tenancy.context import require_current_college
 from apps.tenancy.models import TenantModel
+
+from . import config
 
 code_validator = RegexValidator(
     r"^[A-Z0-9][A-Z0-9_-]{0,19}$", "Use capital letters, digits, hyphens and underscores only."
@@ -230,3 +233,173 @@ class FeeStructureLine(Audited, TenantModel):
     def save(self, *args, **kwargs):
         self.check_instalment()
         super().save(*args, **kwargs)
+
+
+class Concession(Audited, TenantModel):
+    """A scholarship or concession for one student in one academic year (D28).
+
+    It counts only once the principal approves it. A percentage can cover every fee head;
+    a fixed amount names one head and is taken from that head's earliest instalments first.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting for approval"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    class Funder(models.TextChoices):
+        GOVERNMENT = "government", "Government scholarship"
+        COLLEGE = "college", "College concession"
+
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="concessions")
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField("type", max_length=20)
+    funded_by = models.CharField(max_length=10, choices=Funder.choices, editable=False)
+    head = models.ForeignKey(
+        FeeHead,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Leave blank for a percentage off every fee head.",
+    )
+    percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.01")), MaxValueValidator(Decimal("100"))],
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    reason = models.CharField(max_length=200, help_text="e.g. the sanction order number.")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+    )
+    decided_at = models.DateTimeField(null=True, blank=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(percent__isnull=False) & models.Q(amount__isnull=True))
+                | (
+                    models.Q(percent__isnull=True)
+                    & models.Q(amount__isnull=False)
+                    & models.Q(head__isnull=False)
+                ),
+                name="concession_percent_or_amount_for_a_head",
+            ),
+        ]
+        indexes = [models.Index(fields=["college", "student", "academic_year", "status"])]
+
+    def __str__(self) -> str:
+        size = f"{self.percent}%" if self.percent is not None else f"₹{self.amount}"
+        return f"{self.kind} {size} for {self.student.roll_number}"
+
+    @property
+    def scope_department_id(self) -> int | None:
+        return self.student.scope_department_id if self.student_id else None
+
+    def check_rules(self) -> None:
+        if self.college_id is None:
+            self.college = require_current_college()
+        types = config.concession_types(self.college)
+        if self.kind not in types:
+            raise ValidationError(
+                {"kind": f"{self.kind} is not a concession type of this college."}
+            )
+        if self.percent is None and self.amount is None:
+            raise ValidationError("Give either a percentage or an amount.")
+        if self.percent is not None and self.amount is not None:
+            raise ValidationError("Give a percentage or an amount, not both.")
+        if self.amount is not None and self.head_id is None:
+            raise ValidationError({"head": "A fixed amount must name the fee head it is for."})
+        if not self.funded_by:
+            self.funded_by = types[self.kind][1]
+
+    def clean(self):
+        super().clean()
+        self.check_rules()
+
+    def save(self, *args, **kwargs):
+        self.check_rules()
+        super().save(*args, **kwargs)
+
+
+class StudentDue(Audited, TenantModel):
+    """What one student owes for one fee head in one instalment (D28).
+
+    Raised from the student's fee structure. ``waived`` is the college's concession and
+    ``govt_share`` the part expected from a government scholarship; neither is the
+    student's to pay. ``paid`` is kept up to date by receipts.
+    """
+
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="dues")
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="+")
+    structure = models.ForeignKey(FeeStructure, on_delete=models.PROTECT, related_name="dues")
+    instalment_number = models.PositiveSmallIntegerField()
+    instalment_label = models.CharField(max_length=50)
+    due_date = models.DateField()
+    head = models.ForeignKey(FeeHead, on_delete=models.PROTECT, related_name="dues")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    waived = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
+    govt_share = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
+    paid = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO, editable=False)
+    raised_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["student", "due_date", "instalment_number", "head__sort_order"]
+        verbose_name = "student due"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["college", "student", "academic_year", "instalment_number", "head"],
+                name="unique_student_due",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0)
+                & models.Q(waived__gte=0)
+                & models.Q(govt_share__gte=0)
+                & models.Q(paid__gte=0),
+                name="student_due_amounts_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    amount__gte=models.F("waived") + models.F("govt_share") + models.F("paid")
+                ),
+                name="student_due_not_overpaid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["college", "student", "academic_year"]),
+            models.Index(fields=["college", "due_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.student.roll_number} {self.instalment_label} {self.head}"
+
+    @property
+    def scope_department_id(self) -> int | None:
+        return self.student.scope_department_id if self.student_id else None
+
+    @property
+    def payable(self) -> Decimal:
+        """What the student has to pay, before any payment."""
+        return self.amount - self.waived - self.govt_share
+
+    @property
+    def balance(self) -> Decimal:
+        return self.payable - self.paid

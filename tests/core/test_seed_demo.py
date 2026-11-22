@@ -12,7 +12,7 @@ from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.admissions.models import Application, Intake
 from apps.audit.models import AuditEvent
-from apps.fees.models import FeeHead, FeeStructure, PaymentAccount
+from apps.fees.models import FeeHead, FeeStructure, PaymentAccount, StudentDue
 from apps.students.models import Batch, Consent, Guardian, Section, Student, StudentSemester
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
@@ -94,6 +94,7 @@ def test_creates_academic_structure():
         structure = FeeStructure.objects.first()
         assert structure.year_of_study == 1
         assert structure.total() == Decimal("58000")
+        assert StudentDue.objects.count() == 12 * 5
 
 
 def test_demo_users_can_log_in_on_their_college_only(client):

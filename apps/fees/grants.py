@@ -18,3 +18,19 @@ for model, label in [
     register(f"fees.change_{model}", SETUP, f"Change {label}")
     # Protected foreign keys stop anything that is in use from being deleted.
     register(f"fees.delete_{model}", SETUP, f"Delete unused {label}")
+
+# Concessions: the accounts office and office staff enter them; only the principal decides.
+register("fees.view_concession", READERS, "See concessions and scholarships")
+for action in ["add", "change"]:
+    register(
+        f"fees.{action}_concession",
+        [*SETUP, Role.OFFICE],
+        f"{action} concessions waiting for approval",
+    )
+register("fees.approve_concession", [Role.PRINCIPAL], "Approve, reject or withdraw concessions")
+# No delete: a concession is rejected or withdrawn instead, so the decision stays on record.
+
+register("fees.view_studentdue", READERS, "See student dues")
+register("fees.raise_dues", SETUP, "Raise a batch's dues from its fee structure")
+# Dues are never added, changed or deleted by hand: they come from the structure, concessions
+# and receipts.
