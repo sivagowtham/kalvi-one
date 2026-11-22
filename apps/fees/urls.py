@@ -9,4 +9,6 @@ urlpatterns = [
     path("collect/<int:pk>/", views.collect_student, name="collect_student"),
     path("receipts/<int:pk>/", views.receipt_view, name="receipt"),
     path("receipts/<int:pk>/cancel/", views.cancel_receipt, name="cancel_receipt"),
+    path("reports/dues/", views.dues_report, name="dues_report"),
+    path("reports/collections/", views.collections_report, name="collections_report"),
 ]

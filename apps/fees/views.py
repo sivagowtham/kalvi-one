@@ -8,12 +8,14 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
+from apps.academics.models import AcademicYear
 from apps.accounts.permissions import has_perm, require_perm
-from apps.students.models import Student
+from apps.students.models import Batch, Student
 
-from . import receipts
-from .models import ZERO, PaymentAccount, PaymentMode, Receipt, StudentDue
+from . import receipts, reports
+from .models import ZERO, FeeHead, PaymentAccount, PaymentMode, Receipt, StudentDue
 from .words import rupees_in_words
 
 
@@ -155,4 +157,167 @@ def cancel_receipt(request, pk):
             return redirect("fees:receipt", pk=receipt.pk)
     return render(
         request, "fees/cancel.html", _college(request) | {"receipt": receipt, "form": form}
+    )
+
+
+class DuesReportForm(forms.Form):
+    overdue = forms.BooleanField(required=False, label="Only what is overdue today")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["academic_year"] = forms.ModelChoiceField(
+            queryset=AcademicYear.objects.all(), required=False, empty_label="Every year"
+        )
+        self.fields["batch"] = forms.ModelChoiceField(
+            queryset=Batch.objects.select_related("programme").filter(is_active=True),
+            required=False,
+            empty_label="Every batch",
+        )
+        self.fields["head"] = forms.ModelChoiceField(
+            queryset=FeeHead.objects.all(), required=False, empty_label="Every fee head"
+        )
+        self.order_fields(["academic_year", "batch", "head", "overdue"])
+
+    def filters(self) -> reports.DuesFilter:
+        data = self.cleaned_data
+        return reports.DuesFilter(
+            academic_year=data.get("academic_year"),
+            batch=data.get("batch"),
+            head=data.get("head"),
+            overdue_on=timezone.localdate() if data.get("overdue") else None,
+        )
+
+
+@require_perm("fees.view_reports")
+def dues_report(request):
+    if request.GET:
+        form = DuesReportForm(request.GET)
+    else:
+        current = AcademicYear.objects.filter(is_current=True).first()
+        form = DuesReportForm({"academic_year": current.pk if current else ""})
+    filters = form.filters() if form.is_valid() else reports.DuesFilter()
+    batches, totals = reports.dues_by_batch(filters)
+    owing = reports.students_owing(filters) if filters.batch is not None else []
+    if request.GET.get("format") == "xlsx":
+        sheets = [
+            (
+                "By batch",
+                [
+                    "Batch",
+                    "Students",
+                    "Owing",
+                    "Fees",
+                    "Concession",
+                    "Government",
+                    "To pay",
+                    "Paid",
+                    "Balance",
+                ],
+                [
+                    [
+                        r["batch"],
+                        r["students"],
+                        r["owing"],
+                        r["amount"],
+                        r["waived"],
+                        r["govt_share"],
+                        r["payable"],
+                        r["paid"],
+                        r["balance"],
+                    ]
+                    for r in batches
+                ],
+            ),
+            (
+                "Students owing",
+                ["Roll number", "Name", "Mobile", "To pay", "Paid", "Balance", "Government"],
+                [
+                    [
+                        r["roll_number"],
+                        r["name"],
+                        r["mobile"],
+                        r["payable"],
+                        r["paid"],
+                        r["balance"],
+                        r["govt_share"],
+                    ]
+                    for r in reports.students_owing(filters)
+                ],
+            ),
+        ]
+        return reports.xlsx_response(f"dues-{timezone.localdate():%Y-%m-%d}.xlsx", sheets)
+    query = request.GET.urlencode()
+    return render(
+        request,
+        "fees/dues_report.html",
+        _college(request)
+        | {
+            "form": form,
+            "batches": batches,
+            "totals": totals,
+            "owing": owing,
+            "batch": filters.batch,
+            "query": query,
+            "can_collect": has_perm(request.user, "fees.collect"),
+        },
+    )
+
+
+class CollectionsForm(forms.Form):
+    start = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), label="From")
+    end = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), label="To")
+
+    def clean(self):
+        data = super().clean()
+        if data.get("start") and data.get("end") and data["start"] > data["end"]:
+            raise ValidationError("The start date is after the end date.")
+        if data.get("start") and data.get("end") and (data["end"] - data["start"]).days > 366:
+            raise ValidationError("Choose at most a year at a time.")
+        return data
+
+
+@require_perm("fees.view_reports")
+def collections_report(request):
+    today = timezone.localdate()
+    form = CollectionsForm(request.GET or {"start": today, "end": today})
+    result = None
+    if form.is_valid():
+        start, end = form.cleaned_data["start"], form.cleaned_data["end"]
+        result = reports.collections(start, end)
+        if request.GET.get("format") == "xlsx":
+            modes = dict(PaymentMode.choices)
+            return reports.xlsx_response(
+                f"collections-{start:%Y-%m-%d}-to-{end:%Y-%m-%d}.xlsx",
+                [
+                    (
+                        "By day",
+                        ["Date", "Mode", "Receipts", "Amount"],
+                        [
+                            [r["date"], modes[r["mode"]], r["count"], r["amount"]]
+                            for r in result["by_day"]
+                        ],
+                    ),
+                    (
+                        "By fee head",
+                        ["Fee head", "Tally ledger", "Amount", "CGST", "SGST"],
+                        [
+                            [
+                                r["head__name"],
+                                r["head__tally_ledger"],
+                                r["amount"],
+                                r["cgst"],
+                                r["sgst"],
+                            ]
+                            for r in result["by_head"]
+                        ],
+                    ),
+                ],
+            )
+        modes = dict(PaymentMode.choices)
+        for row in result["by_day"]:
+            row["mode_label"] = modes[row["mode"]]
+    return render(
+        request,
+        "fees/collections_report.html",
+        _college(request) | {"form": form, "result": result, "query": request.GET.urlencode()},
     )

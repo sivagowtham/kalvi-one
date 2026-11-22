@@ -39,6 +39,7 @@ How to use this file:
 | D27 | Fee heads carry their Tally ledger and GST rate; a fee structure is one batch's year, split into instalments | Accepted |
 | D28 | Dues are raised per student, head and instalment; concessions count once the principal approves, split into college and government shares | Accepted |
 | D29 | Receipts are taken on a phone-first counter page, settle the oldest dues first, are numbered per financial year and are cancelled, never deleted | Accepted |
+| D30 | Dues and collection reports are phone-friendly pages with Excel downloads; the admissions fee tick box stays for now | Accepted |
 
 ---
 
@@ -415,3 +416,18 @@ How to use this file:
   - Amounts are shown with Indian digit grouping (1,23,456.00), and in words with lakh and crore.
 - **Alternatives:** Taking payments inside the Django admin (unusable on a phone); letting the cashier choose which dues to pay (more taps, and more mistakes at a busy counter; can be added later); a separate receipt number table (the existing locked counter already does this).
 - **Consequences:** A student who overpays or wants to pay in advance cannot yet; refunds and advances need their own change. Sharing on WhatsApp is done by saving the receipt as a PDF from the phone for now.
+
+## D30. Dues and collection reports
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** The principal and accounts office need to see what is still owed (by batch, fee head and overdue), what has been collected each day by mode and fee head, and what is expected from government scholarships. Accountants also want the same figures in Excel.
+- **Decision:**
+  - `/fees/reports/dues/` shows totals to collect, collected, left and expected from government, then one row per batch with how many students still owe. Filters are academic year (current by default), batch, fee head and "only what is overdue today". Choosing a batch lists its students who owe, largest balance first; users who can collect get a link to the counter page for each.
+  - `/fees/reports/collections/` shows valid receipts between two dates (today by default, at most a year) per day and mode, and per fee head with CGST and SGST. Cancelled receipts are counted separately and left out of the totals.
+  - Both pages download as Excel (openpyxl) with the same filters. The students sheet includes mobile numbers for follow-up calls and nothing from the encrypted fields.
+  - `fees.view_reports` goes to everyone who can see dues: principal, accounts, office and HODs.
+  - Totals are worked out in the database from `StudentDue` and `Receipt`, not stored.
+  - The admissions "fee paid" tick box stays. Applicants pay before they are students, and receipts belong to students (D29), so a real check needs receipts for applicants. That is left until colleges say how they take admission fees.
+- **Alternatives:** Stored daily totals (faster at large scale, but one more thing to keep right); a report builder (too much for the first version, and the AI questions in step 6 cover ad hoc needs).
+- **Consequences:** D21's note that the fees module will replace the tick box is postponed, not dropped.

@@ -40,3 +40,6 @@ register("fees.view_receipt", READERS, "See and print fee receipts")
 register("fees.collect", SETUP, "Take fee payments and issue receipts")
 register("fees.cancel_receipt", [Role.PRINCIPAL], "Cancel a fee receipt")
 register("fees.view_receiptline", READERS, "See the fee heads a receipt paid")
+
+# Reports (D30): everyone who can see dues can see the reports and download them.
+register("fees.view_reports", READERS, "See and download dues and collection reports")
