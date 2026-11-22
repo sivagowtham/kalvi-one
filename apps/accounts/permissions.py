@@ -103,7 +103,10 @@ def require_perm(code: str) -> Callable:
                 return redirect_to_login(request.get_full_path())
             if not has_perm(request.user, code):
                 permission_denied.send(sender=None, request=request, code=code)
-                raise PermissionDenied
+                # Return the 403 instead of raising, so ATOMIC_REQUESTS keeps the audit record.
+                from django.views.defaults import permission_denied as forbidden
+
+                return forbidden(request, PermissionDenied())
             return view(request, *args, **kwargs)
 
         wrapped.kalvi_permission = code

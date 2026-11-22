@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.tenancy",
     "apps.accounts",
+    "apps.audit",
 ]
 
 MIDDLEWARE = [
@@ -38,6 +39,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.audit.context.AuditContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

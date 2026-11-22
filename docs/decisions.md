@@ -17,12 +17,13 @@ How to use this file:
 | D5 | Python 3.13, Django 5.2 LTS, PostgreSQL 17 | Accepted |
 | D6 | Custom user model from the first migration; each user belongs to one college, platform staff to none | Accepted |
 | D7 | Fixed roles in code, assignments in the database, one permission registry, default deny enforced by a test | Accepted |
+| D8 | Custom append-only audit log written from model signals, in the same database | Accepted |
 | D10 | Only fake data in the repo, seeds and CI | Accepted |
 | D11 | Tooling: uv, ruff, pytest-django, factory_boy, GitHub Actions | Accepted |
 | D12 | Current college resolved from the host and held in a context variable; tenant queries fail closed | Accepted |
 | D13 | Per-college configuration in a JSON field, rare needs as per-college feature flags | Accepted |
 
-D8 (audit log) and D9 (semester as term) will be recorded in the pull requests that implement them.
+D9 (semester as term) will be recorded in the pull request that implements it.
 
 ---
 
@@ -138,3 +139,22 @@ D8 (audit log) and D9 (semester as term) will be recorded in the pull requests t
   - Denied requests send a `permission_denied` signal, which the audit log will record.
 - **Alternatives:** Django groups and permissions edited in admin. These are flexible, but access rules then live in the database where code review never sees them. django-guardian (object-level permissions) is more than we need now.
 - **Consequences:** Changing who can do what is a code change, visible in review. Object-level rules, such as a HOD's scope stopping at their own department, are added per permission when the models exist (PR 5).
+
+## D8. Audit log
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (plan question 7: record changes, logins and denials, not reads; keep indefinitely)
+- **Context:** Colleges need to know who changed what and when, for marks, fees and student records above all. The log must be trustworthy, and it must respect the college boundary.
+- **Decision:**
+  - `audit.AuditEvent` stores one row per event: college, actor (plus a username snapshot), action, object type and ID, object description, field changes as `{field: [before, after]}`, extra data, request ID, IP address, user agent and time.
+  - The actions are create, update, delete, login, failed login, logout and permission denied.
+  - A model opts in with the `Audited` mixin. Save and delete signals write the events. Saves that change nothing are skipped. `audit_exclude` drops noisy fields (`User.last_login`), and `audit_mask` records only that a field changed, never its value (`User.password`).
+  - `AuditContextMiddleware` captures the actor, the request ID (taken from `X-Request-ID` or generated, and echoed in the response), the IP address and the user agent. Scripts set the same data with `audit_context(...)`.
+  - Rows are append-only: save-after-create, delete, queryset update, delete and bulk_update all raise. Admin shows them read-only to the principal.
+  - Bulk `update`, `bulk_create` and `bulk_update` skip Django's signals, so they are refused on audited tenant models. `audited_update()` is the deliberate bulk path. A queryset `delete()` still fires signals, so it stays audited.
+  - Audit events are in the same transaction as the change: if the change rolls back, so does its record. `@require_perm` returns its 403 rather than raising, so a denial record survives `ATOMIC_REQUESTS`.
+  - Audited now: College, CollegeFeature, User and RoleAssignment.
+- **Alternatives:**
+  - django-auditlog and django-simple-history are mature, but they don't know our college boundary, and simple-history adds a history table per model.
+  - django-pghistory uses database triggers, which catch even raw SQL, but brings more moving parts and is harder to read for newcomers.
+- **Consequences:** Raw SQL and `User` bulk updates are not audited, and reviewers must flag them. Append-only is enforced in the application, not the database. A database role without UPDATE or DELETE on `audit_auditevent`, or a trigger, can be added at deployment. The table will grow without limit, and partitioning or archiving gets its own decision once volumes are known.

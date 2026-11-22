@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 
+from apps.audit.mixins import AuditBypassError, Audited
+
 from .context import CrossCollegeError, get_current_college, require_current_college
 
 # Subdomains that can never belong to a college.
@@ -22,7 +24,7 @@ def validate_not_reserved(value: str) -> None:
         raise ValidationError(f"'{value}' is reserved and cannot be a college subdomain.")
 
 
-class College(models.Model):
+class College(Audited, models.Model):
     """A tenant. Every college-owned row points at exactly one College (D4)."""
 
     class CollegeType(models.TextChoices):
@@ -65,7 +67,7 @@ class College(models.Model):
         return self.features.filter(key=key, enabled=True).exists()
 
 
-class CollegeFeature(models.Model):
+class CollegeFeature(Audited, models.Model):
     """A per-college on/off switch for needs only some colleges have (D1)."""
 
     college = models.ForeignKey(College, on_delete=models.CASCADE, related_name="features")
@@ -84,7 +86,15 @@ class CollegeFeature(models.Model):
 
 
 class TenantQuerySet(models.QuerySet):
+    def _refuse_if_audited(self, operation: str) -> None:
+        if issubclass(self.model, Audited):
+            raise AuditBypassError(
+                f"{operation}() skips the audit log on {self.model.__name__}. "
+                "Save rows one by one, or use apps.audit.bulk.audited_update()."
+            )
+
     def bulk_create(self, objs, *args, **kwargs):
+        self._refuse_if_audited("bulk_create")
         college = require_current_college()
         for obj in objs:
             if obj.college_id is None:
@@ -96,7 +106,12 @@ class TenantQuerySet(models.QuerySet):
     def update(self, **kwargs):
         if "college" in kwargs or "college_id" in kwargs:
             raise CrossCollegeError("A row's college can never be changed.")
+        self._refuse_if_audited("update")
         return super().update(**kwargs)
+
+    def bulk_update(self, objs, fields, *args, **kwargs):
+        self._refuse_if_audited("bulk_update")
+        return super().bulk_update(objs, fields, *args, **kwargs)
 
 
 class TenantManager(models.Manager.from_queryset(TenantQuerySet)):

@@ -4,6 +4,7 @@ from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
+from apps.audit.mixins import Audited
 from apps.tenancy.context import CrossCollegeError
 from apps.tenancy.models import College, TenantModel
 
@@ -28,8 +29,11 @@ class UserManager(BaseUserManager):
         return self.create_user(username, password, college=None, **fields)
 
 
-class User(AbstractBaseUser):
+class User(Audited, AbstractBaseUser):
     """A person who can log in. Belongs to one college, or to none for platform staff (D6)."""
+
+    audit_exclude = ("last_login",)
+    audit_mask = ("password",)
 
     college = models.ForeignKey(
         College,
@@ -108,7 +112,7 @@ class User(AbstractBaseUser):
         return permissions.roles_for(self, self.college)
 
 
-class RoleAssignment(TenantModel):
+class RoleAssignment(Audited, TenantModel):
     """Gives a user one role in their college. A user may hold several (D7)."""
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="role_assignments")
