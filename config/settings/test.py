@@ -26,3 +26,4 @@ TENANT_PLATFORM_HOSTS = ["testserver", "localhost"]
 TENANT_DEDICATED_COLLEGE_SLUG = ""
 ROOT_URLCONF = "tests.urls"
 ALLOW_DEMO_SEED = True
+COLLEGE_URL_TEMPLATE = "http://{slug}.{base}"

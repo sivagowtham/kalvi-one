@@ -1,0 +1,12 @@
+{% autoescape off %}Hello {{ user.get_short_name }},
+
+{% if college %}{{ college.name }}{% else %}KalviOne{% endif %} has set up an account for you on KalviOne.
+
+Your username: {{ user.username }}
+
+Open this link to choose your password. It works once, for the next {{ valid_for }}:
+
+{{ link }}
+
+After that, sign in with your username and the password you chose.
+{% endautoescape %}

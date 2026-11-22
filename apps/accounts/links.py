@@ -52,6 +52,21 @@ class LinkTokenGenerator(PasswordResetTokenGenerator):
 
 
 reset_tokens = LinkTokenGenerator("kalvione.accounts.reset", "PASSWORD_RESET_TIMEOUT")
+invite_tokens = LinkTokenGenerator("kalvione.accounts.invite", "INVITE_LINK_TIMEOUT")
+
+
+def college_url(college) -> str:
+    """The web address of ``college``, for links sent outside a request (D25)."""
+    base = settings.TENANT_BASE_DOMAINS[0] if settings.TENANT_BASE_DOMAINS else "localhost"
+    return settings.COLLEGE_URL_TEMPLATE.format(slug=college.slug, base=base).rstrip("/")
+
+
+def _valid_for(seconds: int) -> str:
+    minutes = seconds // 60
+    if minutes < 120:
+        return f"{minutes} minutes"
+    hours = minutes // 60
+    return f"{hours} hours" if hours < 48 else f"{hours // 24} days"
 
 
 def reset_emails_last_hour(user) -> int:
@@ -65,20 +80,13 @@ def reset_emails_last_hour(user) -> int:
     ).count()
 
 
-def link_for(request, user, tokens, url_name: str) -> str:
+def link_path(user, tokens, url_name: str) -> str:
     uid = urlsafe_base64_encode(force_bytes(user.pk))
-    path = reverse(url_name, kwargs={"uidb64": uid, "token": tokens.make_token(user)})
-    # The host is the college's own address; TenantMiddleware has already checked it.
-    return request.build_absolute_uri(path)
+    return reverse(url_name, kwargs={"uidb64": uid, "token": tokens.make_token(user)})
 
 
-def send_link_email(request, user, *, template: str, link: str, valid_for: str) -> None:
-    context = {
-        "user": user,
-        "college": getattr(request, "college", None),
-        "link": link,
-        "valid_for": valid_for,
-    }
+def send_link_email(user, *, template: str, link: str, valid_for: str) -> None:
+    context = {"user": user, "college": user.college, "link": link, "valid_for": valid_for}
     subject = render_to_string(f"accounts/email/{template}_subject.txt", context)
     body = render_to_string(f"accounts/email/{template}_body.txt", context)
     send_mail(" ".join(subject.split()), body, None, [user.email])
@@ -90,13 +98,13 @@ def send_reset_email(request, user) -> bool:
         reset_emails_last_hour(user) < settings.PASSWORD_RESET_EMAILS_PER_HOUR
     )
     if sent:
-        minutes = settings.PASSWORD_RESET_TIMEOUT // 60
+        # The host is the college's own address; TenantMiddleware has already checked it.
+        path = link_path(user, reset_tokens, "accounts:reset_confirm")
         send_link_email(
-            request,
             user,
             template="reset",
-            link=link_for(request, user, reset_tokens, "accounts:reset_confirm"),
-            valid_for=f"{minutes} minutes" if minutes < 120 else f"{minutes // 60} hours",
+            link=request.build_absolute_uri(path),
+            valid_for=_valid_for(settings.PASSWORD_RESET_TIMEOUT),
         )
     reason = "" if sent else ("no_email" if not user.email else "too_many")
     recorder.record(
@@ -105,3 +113,23 @@ def send_reset_email(request, user) -> bool:
         extra={"sent": sent, **({"reason": reason} if reason else {})},
     )
     return sent
+
+
+def can_invite(user) -> bool:
+    """Invites are for active accounts with an email that have never had a password."""
+    return user.is_active and bool(user.email) and not user.has_usable_password()
+
+
+def send_invite(user) -> bool:
+    """Email ``user`` a link to choose their first password. Audited. False if skipped."""
+    if not can_invite(user):
+        return False
+    path = link_path(user, invite_tokens, "accounts:invite_accept")
+    send_link_email(
+        user,
+        template="invite",
+        link=college_url(user.college) + path,
+        valid_for=_valid_for(settings.INVITE_LINK_TIMEOUT),
+    )
+    recorder.record(AuditEvent.Action.INVITE_SENT, instance=user)
+    return True
