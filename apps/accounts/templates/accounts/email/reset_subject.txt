@@ -1,0 +1,1 @@
+Set a new password for {% if college %}{{ college.name }}{% else %}KalviOne{% endif %}

@@ -13,5 +13,6 @@
   <input type="hidden" name="next" value="{{ next }}">
   <button type="submit" class="full">Sign in</button>
 </form>
+<p><a href="{% url 'accounts:forgot_password' %}">Forgot password?</a></p>
 <p class="muted">Staff sign in with their email. Students sign in with their roll number.</p>
 {% endblock %}
