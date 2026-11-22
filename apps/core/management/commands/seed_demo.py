@@ -14,6 +14,7 @@ from apps.academics.models import AcademicYear, Course, Department, Programme, S
 from apps.accounts.models import RoleAssignment, User
 from apps.accounts.roles import STAFF_ROLES, Role
 from apps.audit.context import audit_context
+from apps.students.models import Batch, Section
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
 
@@ -32,6 +33,7 @@ class CollegeSpec:
     programmes: tuple[tuple[str, str, str, str, int], ...]  # code, dept, name, level, years
     courses: tuple[tuple[str, int, str, str, str, str], ...]  # prog, sem, code, title, cr, type
     roll_prefix: str
+    sections: tuple[str, ...] = ("A",)
 
 
 DEMO = CollegeSpec(
@@ -59,6 +61,7 @@ DEMO = CollegeSpec(
         ("BE-ECE", 5, "DE5501", "Signals and Systems", "4", "theory"),
     ),
     roll_prefix="26DCE",
+    sections=("A", "B"),
 )
 
 SAMPLE = CollegeSpec(
@@ -185,6 +188,10 @@ class Command(BaseCommand):
                 term=Semester.Term.EVEN,
                 defaults={"start_date": dt.date(2026, 12, 15), "end_date": dt.date(2027, 4, 30)},
             )
+            for programme in programmes.values():
+                batch, _ = Batch.objects.get_or_create(programme=programme, admission_year=year)
+                for name in spec.sections:
+                    Section.objects.get_or_create(batch=batch, name=name, defaults={"capacity": 60})
             first_department = departments[spec.departments[0][0]]
             self.stdout.write(f"\n{college.name}  ->  http://{college.slug}.localhost:8000/admin/")
             for suffix, roles in USERS:
