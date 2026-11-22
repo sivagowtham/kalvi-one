@@ -10,7 +10,7 @@ from apps.academics.models import AcademicYear, Course, Department, Programme, S
 from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.audit.models import AuditEvent
-from apps.students.models import Batch, Consent, Guardian, Section, Student
+from apps.students.models import Batch, Consent, Guardian, Section, Student, StudentSemester
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
 
@@ -37,6 +37,7 @@ def counts():
             Student,
             Guardian,
             Consent,
+            StudentSemester,
         )
     } | {"users": User.objects.count(), "colleges": College.objects.count()}
 
@@ -78,6 +79,8 @@ def test_creates_academic_structure():
         first = Student.objects.get(roll_number="26DCE001")
         assert first.user.username == "26DCE001"
         assert first.has_secret("aadhaar")
+        assert StudentSemester.objects.filter(semester_number=1).count() == 12
+        assert StudentSemester.objects.filter(section__name="B").count() == 6
 
 
 def test_demo_users_can_log_in_on_their_college_only(client):

@@ -1,0 +1,46 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Promote {{ batch }}</h1>
+<form method="get">
+  <label>From term
+    <select name="term" onchange="this.form.submit()">
+      {% for term in terms %}<option value="{{ term.pk }}"{% if term.pk == plan.from_term.pk %} selected{% endif %}>{{ term }}</option>{% endfor %}
+    </select>
+  </label>
+</form>
+{% if plan.to_term %}
+  <p>Students move to <strong>{{ plan.to_term }}</strong>. Tick "Hold back" for anyone detained or on a break.</p>
+{% else %}
+  <p class="errornote">The next term does not exist yet. Add it under Academics first.</p>
+{% endif %}
+{% if plan.already_promoted %}<p>{{ plan.already_promoted }} student(s) are already in the next term and are not shown.</p>{% endif %}
+{% for warning in warnings %}<p class="warning">{{ warning }}</p>{% endfor %}
+{% if plan.rows %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="term" value="{{ plan.from_term.pk }}">
+  <table>
+    <thead><tr><th>Roll number</th><th>Name</th><th>Now</th><th>Next</th><th>Section</th><th>Hold back</th></tr></thead>
+    <tbody>
+    {% for row in plan.rows %}
+      <tr>
+        <td>{{ row.student.roll_number }}</td>
+        <td>{{ row.student.display_name }}</td>
+        <td>Semester {{ row.current.semester_number }}, {{ row.current.section.name }}</td>
+        <td>{% if row.next_number %}Semester {{ row.next_number }}{% else %}Finishes the course{% endif %}</td>
+        <td>{% if row.next_number %}
+          <select name="section_{{ row.current.pk }}">
+            {% for section in sections %}<option value="{{ section.pk }}"{% if section.pk == row.current.section_id %} selected{% endif %}>{{ section.name }}</option>{% endfor %}
+          </select>{% endif %}</td>
+        <td><input type="checkbox" name="hold_{{ row.current.pk }}"></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if plan.to_term or plan.finishing %}<p><input type="submit" class="default" value="Promote {{ plan.rows|length }} student(s)"></p>{% endif %}
+</form>
+{% else %}
+  <p>Nobody in this batch is left to promote from {{ plan.from_term }}.</p>
+{% endif %}
+<p><a href="{{ back_url }}">Back to the batch</a></p>
+{% endblock %}

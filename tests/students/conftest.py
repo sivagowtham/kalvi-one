@@ -45,3 +45,18 @@ def make_student():
             return Student.objects.create(batch=batch, roll_number=roll, **(defaults | fields))
 
     return _make
+
+
+@pytest.fixture
+def even_term(college_a, core_a):
+    import datetime as dt
+
+    from apps.academics.models import Semester
+
+    with college_context(college_a):
+        return Semester.objects.create(
+            academic_year=core_a["year"],
+            term="even",
+            start_date=dt.date(2026, 12, 1),
+            end_date=dt.date(2027, 4, 30),
+        )

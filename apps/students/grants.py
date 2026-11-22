@@ -41,3 +41,18 @@ for model in ["guardian", "consent"]:
     for action in ["view", "add", "change"]:
         register(f"students.{action}_{model}", CLERKS, f"{action} {model} records")
 # No delete permissions for students, guardians or consent: records change status instead.
+
+register("students.view_studentsemester", STAFF_READERS, "See which section and semester")
+for action in ["add", "change"]:
+    register(
+        f"students.{action}_studentsemester",
+        [Role.PRINCIPAL, Role.HOD, Role.OFFICE],
+        f"{action} a student's section and semester for a term",
+        department_scoped=True,
+    )
+register(
+    "students.promote_batch",
+    [Role.PRINCIPAL, Role.HOD, Role.OFFICE],
+    "Promote a batch to the next term",
+    department_scoped=True,
+)
