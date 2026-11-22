@@ -42,7 +42,7 @@ class UserChangeForm(forms.ModelForm):
 class RoleAssignmentInline(admin.TabularInline):
     model = RoleAssignment
     extra = 0
-    fields = ["role"]
+    fields = ["role", "department"]
 
     def get_queryset(self, request):
         # The parent user already limits rows; the manager adds the college filter.
@@ -99,7 +99,7 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(RoleAssignment)
 class RoleAssignmentAdmin(TenantModelAdmin):
-    list_display = ["user", "role", "created_at"]
+    list_display = ["user", "role", "department", "created_at"]
     list_filter = ["role"]
     search_fields = ["user__username", "user__full_name"]
     autocomplete_fields = ["user"]

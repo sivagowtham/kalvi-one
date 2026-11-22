@@ -18,12 +18,13 @@ How to use this file:
 | D6 | Custom user model from the first migration; each user belongs to one college, platform staff to none | Accepted |
 | D7 | Fixed roles in code, assignments in the database, one permission registry, default deny enforced by a test | Accepted |
 | D8 | Custom append-only audit log written from model signals, in the same database | Accepted |
+| D9 | A semester is an odd or even term of an academic year | Accepted |
 | D10 | Only fake data in the repo, seeds and CI | Accepted |
 | D11 | Tooling: uv, ruff, pytest-django, factory_boy, GitHub Actions | Accepted |
 | D12 | Current college resolved from the host and held in a context variable; tenant queries fail closed | Accepted |
 | D13 | Per-college configuration in a JSON field, rare needs as per-college feature flags | Accepted |
-
-D9 (semester as term) will be recorded in the pull request that implements it.
+| D14 | HOD permissions stop at their own department, checked per object | Accepted |
+| D15 | Minimal academic core: Course is a subject in one programme, regulation is text | Accepted |
 
 ---
 
@@ -158,3 +159,35 @@ D9 (semester as term) will be recorded in the pull request that implements it.
   - django-auditlog and django-simple-history are mature, but they don't know our college boundary, and simple-history adds a history table per model.
   - django-pghistory uses database triggers, which catch even raw SQL, but brings more moving parts and is harder to read for newcomers.
 - **Consequences:** Raw SQL and `User` bulk updates are not audited, and reviewers must flag them. Append-only is enforced in the application, not the database. A database role without UPDATE or DELETE on `audit_auditevent`, or a trigger, can be added at deployment. The table will grow without limit, and partitioning or archiving gets its own decision once volumes are known.
+
+## D9. A semester is a term of an academic year
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** In Tamil Nadu colleges the calendar runs in two terms each year. In the odd term students study semesters 1, 3, 5 and 7, and in the even term 2, 4, 6 and 8.
+- **Decision:** `Semester` is a term (odd or even) of an `AcademicYear`, with its own dates. A programme's semester number (1 to 8) is a separate idea, held on `Course.semester_number`. `Semester.semester_numbers(n)` maps a term to the semester numbers it runs. Each college has at most one current academic year and one current term, which database constraints enforce.
+- **Alternatives:** One `Semester` row per programme semester per year. That model is closer to a timetable, but duplicates the calendar for every programme.
+- **Consequences:** Colleges on trimesters or annual patterns would need a new term type. That is configuration under D1, added when a college needs it.
+
+## D14. HOD scope is their own department
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Decision:**
+  - A HOD `RoleAssignment` must name a department, which a database constraint enforces, and one person may head several departments.
+  - A permission registered with `department_scoped=True` lets a user whose only granting role is HOD act only on objects whose `scope_department_id` is one of their departments. Any other granting role, such as principal, is college-wide.
+  - Checks without an object, such as list pages, are allowed. In admin, HOD course forms offer only their own programmes, and saves are re-checked against the object.
+- **Alternatives:** Admin querysets filtered by department for HODs. That is stricter for reading, but HODs and faculty routinely need to see other departments' courses.
+- **Consequences:** Every new department-level model exposes `scope_department_id`. Reading stays college-wide unless a module decides otherwise.
+
+## D15. Minimal academic core
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (defaults for plan questions 5 and 6)
+- **Decision:**
+  - Department, Programme, Course, AcademicYear and Semester are tenant models, audited, with codes unique per college.
+  - "Course" means a subject or paper, such as CS3401, taught in one semester of one programme. "Programme" is the degree, such as B.E. CSE.
+  - Regulation, such as R2021, is a text field on Programme for now.
+  - Viewing is open to principal, HOD, faculty, office and exam cell. Structure (years, terms, departments, programmes) is changed by the principal. Courses are changed by the principal or the department's HOD.
+- **Alternatives:** A full curriculum model now, with shared and elective courses across programmes and regulation versions. It was deferred until the staff interviews describe real practice.
+- **Consequences:** A course shared by two programmes is two rows until the curriculum module adds a mapping. Students, enrolment, marks, attendance and fees build on these models later.
