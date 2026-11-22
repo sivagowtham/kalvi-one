@@ -94,7 +94,7 @@ class User(Audited, AbstractBaseUser):
 
     # Django's auth API (used by admin) goes through the same default-deny registry.
     def has_perm(self, perm: str, obj=None) -> bool:
-        return permissions.has_perm_or_deny(self, perm)
+        return permissions.has_perm_or_deny(self, perm, obj)
 
     def has_perms(self, perm_list, obj=None) -> bool:
         return all(self.has_perm(perm, obj) for perm in perm_list)
@@ -117,11 +117,32 @@ class RoleAssignment(Audited, TenantModel):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="role_assignments")
     role = models.CharField(max_length=20, choices=Role.choices)
+    department = models.ForeignKey(
+        "academics.Department",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="role_assignments",
+        help_text="Required for HOD: the department they head. Optional for other roles.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["user", "role"], name="unique_role_per_user"),
+            models.UniqueConstraint(
+                fields=["user", "role"],
+                condition=~models.Q(role=Role.HOD),
+                name="unique_role_per_user",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "role", "department"],
+                condition=models.Q(role=Role.HOD),
+                name="unique_hod_per_department",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(role=Role.HOD) | models.Q(department__isnull=False),
+                name="hod_needs_department",
+            ),
         ]
         ordering = ["user", "role"]
 
@@ -136,4 +157,5 @@ class RoleAssignment(Audited, TenantModel):
         if self.college_id != self.user.college_id:
             raise CrossCollegeError("A role must be in the user's own college.")
         self.user.__dict__.pop("_kalvi_roles", None)
+        self.user.__dict__.pop("_kalvi_hod_departments", None)
         super().save(*args, **kwargs)

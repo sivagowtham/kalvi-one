@@ -96,11 +96,11 @@ def test_role_must_be_in_users_own_college(college_a, college_b, make_user):
 
 
 def test_user_display_helpers(college_a, make_user):
-    user = make_user(college_a, "teacher", roles=[Role.FACULTY, Role.HOD], full_name="Asha Devi")
+    user = make_user(college_a, "teacher", roles=[Role.FACULTY, Role.OFFICE], full_name="Asha Devi")
     assert str(user) == "Asha Devi"
     assert user.get_full_name() == "Asha Devi"
     assert user.get_short_name() == "Asha"
-    assert user.roles() == {Role.FACULTY, Role.HOD}
+    assert user.roles() == {Role.FACULTY, Role.OFFICE}
     assert not user.is_platform_staff
     assert str(user.role_assignments.model.all_colleges.first()).startswith("Asha Devi as")
     bare = make_user(college_a, "nobody")
