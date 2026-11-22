@@ -22,7 +22,11 @@ DEFAULTS: dict[str, Any] = {
         ["GOVT", "Government (counselling)"],
         ["MGMT", "Management"],
     ],
+    # Placeholders: {yy} admission year, {dept} department code, {prog} programme code,
+    # {seq} a running number per filled-in prefix, e.g. {seq:03} gives 001.
     "roll_number_pattern": "{yy}{dept}{seq:03}",
+    "admission_number_pattern": "A{yy}{seq:04}",
+    "application_number_pattern": "APP{yy}{seq:04}",
     "required_documents": [
         ["TC", "Transfer certificate"],
         ["SSLC", "10th mark sheet"],

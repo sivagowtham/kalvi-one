@@ -9,6 +9,7 @@ from django.test import override_settings
 from apps.academics.models import AcademicYear, Course, Department, Programme, Semester
 from apps.accounts.models import User
 from apps.accounts.roles import Role
+from apps.admissions.models import Application, Intake
 from apps.audit.models import AuditEvent
 from apps.students.models import Batch, Consent, Guardian, Section, Student, StudentSemester
 from apps.tenancy.context import college_context
@@ -38,6 +39,8 @@ def counts():
             Guardian,
             Consent,
             StudentSemester,
+            Intake,
+            Application,
         )
     } | {"users": User.objects.count(), "colleges": College.objects.count()}
 
@@ -81,6 +84,9 @@ def test_creates_academic_structure():
         assert first.has_secret("aadhaar")
         assert StudentSemester.objects.filter(semester_number=1).count() == 12
         assert StudentSemester.objects.filter(section__name="B").count() == 6
+        assert Intake.objects.count() == 4
+        assert Application.objects.count() == 10
+        assert Application.objects.filter(status="confirmed").count() == 2
 
 
 def test_demo_users_can_log_in_on_their_college_only(client):

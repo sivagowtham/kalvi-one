@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Enrol {{ application.display_name }}</h1>
+<p>{{ application.programme }}, {{ application.academic_year }}, {{ application.quota }} quota. Batch {{ batch }}.</p>
+<p>This creates the student record, a student login named after the new roll number, the guardians, a consent record and the first-term placement, all at once.</p>
+<form method="post">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <p><input type="submit" class="default" value="Enrol"></p>
+</form>
+<p><a href="{{ back_url }}">Back to the application</a></p>
+{% endblock %}
