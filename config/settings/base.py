@@ -115,3 +115,6 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": env("DJANGO_LOG_LEVEL", default="INFO")},
 }
+
+# The seed_demo command creates fake data; only development and tests allow it (D10).
+ALLOW_DEMO_SEED = False

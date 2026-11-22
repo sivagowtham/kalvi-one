@@ -1,4 +1,4 @@
-.PHONY: up down build migrate shell test lint format check
+.PHONY: up down build migrate seed shell test lint format check
 
 up:            ## Start Django and PostgreSQL in Docker
 	docker compose up --build
@@ -8,6 +8,9 @@ down:          ## Stop the Docker stack
 
 migrate:       ## Apply database migrations
 	docker compose run --rm web python manage.py migrate
+
+seed:          ## Create the fake demo college and one user per role
+	docker compose run --rm web python manage.py seed_demo --with-second-college
 
 shell:         ## Open a Django shell
 	docker compose run --rm web python manage.py shell
