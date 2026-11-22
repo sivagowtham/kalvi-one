@@ -1,5 +1,6 @@
 """The seed_demo command (fake data only, D10)."""
 
+from decimal import Decimal
 from io import StringIO
 
 import pytest
@@ -11,6 +12,7 @@ from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.admissions.models import Application, Intake
 from apps.audit.models import AuditEvent
+from apps.fees.models import FeeHead, FeeStructure, PaymentAccount
 from apps.students.models import Batch, Consent, Guardian, Section, Student, StudentSemester
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
@@ -87,6 +89,11 @@ def test_creates_academic_structure():
         assert Intake.objects.count() == 4
         assert Application.objects.count() == 10
         assert Application.objects.filter(status="confirmed").count() == 2
+        assert FeeHead.objects.count() == 3
+        assert PaymentAccount.objects.count() == 2
+        structure = FeeStructure.objects.first()
+        assert structure.year_of_study == 1
+        assert structure.total() == Decimal("58000")
 
 
 def test_demo_users_can_log_in_on_their_college_only(client):

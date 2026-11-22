@@ -35,6 +35,8 @@ How to use this file:
 | D23 | Each college has its own login page; logins pause after repeated wrong passwords, counted from the audit log | Accepted |
 | D24 | Forgotten passwords are reset through a one-time emailed link on the college's own address; the reply never says whether an account exists | Accepted |
 | D25 | New accounts get an invite email with a 7-day link to choose their first password, sent from admin or a command | Accepted |
+| D26 | Fees is the second domain module; Tally gets a daily XML file of receipt vouchers first, live sync later | Accepted |
+| D27 | Fee heads carry their Tally ledger and GST rate; a fee structure is one batch's year, split into instalments | Accepted |
 
 ---
 
@@ -348,3 +350,34 @@ How to use this file:
   - Emails sent outside a request build the link from `COLLEGE_URL_TEMPLATE` (for example `https://{slug}.kalvione.in`), so they always point at the college's own address.
 - **Alternatives:** Sending invites automatically on enrolment or import (easy to add later, but colleges may want to check the data first); temporary passwords printed on a slip (they get shared and never changed).
 - **Consequences:** `COLLEGE_URL_TEMPLATE` must be set correctly in each deployment. A large college sends hundreds of emails in one run, so the mail provider's sending limits apply; a background queue can come later.
+
+## D26. Fees is the second domain module, with a daily Tally file first
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (Gowtham approved the module plan with its defaults; changes may follow from the accountants and colleges)
+- **Context:** Fees is the module colleges ask about first after students, and most Tamil Nadu colleges keep their accounts in Tally (Prime, or the older ERP 9). Accountants should not have to type each fee receipt into Tally a second time.
+- **Decision:**
+  - Build Fees now as one app, `fees`, in six small pull requests: fee heads, payment accounts and structures; concessions, scholarships and student dues; receipts on a phone-first screen, printing and cancelling; dues reports and the admissions fee check; the daily Tally file; and AI help (dues-risk flags, plain-word questions and reminder drafts).
+  - Tally integration starts as a daily XML file of that day's receipts as Receipt vouchers, which the accountant imports into Tally. A receipt goes into a downloaded file only once. Live sync through Tally's own XML port is a later phase.
+  - The accounts role takes payments and downloads the Tally file. Only the principal approves concessions and cancels receipts. Office staff and HODs can see fee set-up and dues.
+  - Most college fees are exempt from GST, so every fee head is exempt unless it is given a rate.
+  - One Tally ledger per fee head, not per student.
+  - Not in this module yet: online payment links or a gateway, live Tally sync, late fines and refunds.
+  - AI features never send student names, numbers, amounts or sensitive fields to an AI service. Dues-risk flags are worked out on our own server.
+- **Alternatives:** Live Tally sync first (needs Tally running and reachable from our server at every college, which is rare on day one); a CSV for the accountant to key in (still double entry).
+- **Consequences:** Every fee head and payment account needs its Tally ledger name spelt as it is in Tally. A ledger list file will let the accountant create missing ledgers in one import.
+
+## D27. Fee heads, payment accounts and fee structures
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Colleges charge the same kinds of fee (tuition, development, exam, hostel, bus) but in different amounts per batch, year, quota and hostel or day scholar, usually in two or more instalments.
+- **Decision:**
+  - `FeeHead` is one kind of fee with a code, the name printed on receipts, its Tally ledger name, a GST rate (0 to 40, default 0) and, for taxable heads, an HSN or SAC code.
+  - `PaymentAccount` is where money is received: a cash counter or a bank account, each with its Tally ledger name. A college can have several bank accounts.
+  - `FeeStructure` is what one batch pays in one academic year. It can be limited to one quota and to hostel or day scholars; blank means all. When several structures fit a student, the most specific one applies (quota and residence each count once). The year of study is worked out from the batch's admission year and must fall inside the programme's duration.
+  - A structure has `Instalment`s (number, label, due date) and `FeeStructureLine`s (instalment number, fee head, amount). The admin edits both on one page and refuses an amount for an instalment that is not set up.
+  - `College.config["fees"]` holds the Tally company name, the GST output ledgers, the receipt number pattern and the month the financial year starts, documented in `apps/fees/config.py`.
+  - The principal and accounts set up fees; office staff and HODs can only see them. Fee heads in use cannot be deleted.
+- **Alternatives:** One amount per head per year with no instalments (does not match how colleges collect); a structure per student (too much data entry); fee heads as a config list instead of rows (receipts and Tally need a stable row to point at).
+- **Consequences:** Next year's fees are a new structure, so old receipts always point at the amounts that applied then. Copying a structure to a new year can be added when the accountants ask for it.
