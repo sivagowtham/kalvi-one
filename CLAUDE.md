@@ -9,3 +9,4 @@
 - Every college-owned model extends `apps.tenancy.models.TenantModel` and gets isolation tests (D4, D12). Treat `all_colleges` and raw SQL as review flags.
 - Every view needs `@require_perm("code")` or `@public` (D7); register new codes in the app's `grants.py`. The default-deny test fails otherwise.
 - Models holding college data mix in `apps.audit.mixins.Audited` (D8). Never bypass it with queryset `update()`/`bulk_*` or raw SQL; use `apps.audit.bulk.audited_update()`.
+- Sensitive personal data (Aadhaar, community certificate number, income) is encrypted per field (D18). Write it with `set_secret()` and read it only with `reveal()`, which checks `students.view_sensitive` and audits the read (D19). Never log or display ciphertext or decrypted values elsewhere.

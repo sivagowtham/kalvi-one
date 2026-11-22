@@ -27,6 +27,9 @@ How to use this file:
 | D15 | Minimal academic core: Course is a subject in one programme, regulation is text | Accepted |
 | D16 | Students and Admissions is the first domain module, built before the staff survey results | Accepted |
 | D17 | A batch is one programme's intake in one year; sections belong to a batch and placement is recorded per term | Accepted |
+| D18 | Sensitive personal fields are encrypted per field, masked by default, and need their own permission | Accepted |
+| D19 | Revealing an encrypted field is audited (adds to D8) | Accepted |
+| D20 | Community, quota and document lists and the roll number pattern are per-college config with Tamil Nadu defaults | Accepted |
 
 ---
 
@@ -220,3 +223,41 @@ How to use this file:
   - Batches and sections are department-level objects (D14): the principal, the HOD of the programme's department and office staff can add and change them. Only the principal can delete, and protected foreign keys stop a batch or section with students from being deleted.
 - **Alternatives:** Sections fixed on the student record, which is simpler but loses history when sections change; one row per programme semester per term, which duplicates the calendar (rejected in D9 for the same reason).
 - **Consequences:** Class lists for a term are read from `StudentSemester`. A batch that changes regulation mid-course is one edit, recorded in the audit log.
+
+## D18. Field-level encryption for sensitive personal data
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (plan question 2: store Aadhaar encrypted, show the last 4 digits, principal and office may reveal)
+- **Context:** Scholarship and government portals ask for a student's Aadhaar number, community certificate number and family income. Under the DPDP Act these need strong protection, and the Aadhaar rules expect the number to be stored encrypted and shown masked.
+- **Decision:**
+  - Aadhaar, the community certificate number and a guardian's annual income are stored only as Fernet ciphertext (`cryptography`'s MultiFernet) in `<name>_ciphertext` columns. There is no plain attribute: code writes with `set_secret(name, value)` and reads with `reveal(name, user)`.
+  - Aadhaar also keeps `aadhaar_last4` for display (`XXXX XXXX 1234`) and `aadhaar_hash`, an HMAC-SHA256 keyed by `FIELD_HASH_KEY`, so a partial unique constraint stops the same person being admitted twice in a college without decrypting anything.
+  - Aadhaar numbers are checked for form and for their Verhoeff check digit before they are stored, which catches most typing mistakes.
+  - Keys come from `FIELD_ENCRYPTION_KEYS` (comma-separated; the first encrypts, all decrypt, so keys rotate without downtime) and `FIELD_HASH_KEY`. Production settings refuse to start without them. Test settings use fixed fake keys, and development settings fall back to dev-only keys.
+  - `students.view_sensitive` (principal and office) is needed to see community, caste, the category fields, guardians, consent and income in admin, and to reveal encrypted values. Faculty, HODs, exam cell and accounts see the academic record only.
+  - Encrypted columns are masked in the audit log, which records only that they changed.
+- **Alternatives:** A third-party encrypted field package such as django-cryptography, which hides the ciphertext behind a normal attribute, so any template or serializer could leak a value without a permission check; PostgreSQL pgcrypto, which needs the key inside SQL statements and so in database logs; storing only the last 4 digits, which is safest but fails the scholarship use case.
+- **Consequences:** Encrypted fields cannot be searched or sorted, except Aadhaar by exact match through the hash. Losing the keys loses the data, so key backup is part of deployment. Changing `FIELD_HASH_KEY` needs a re-hash of every row.
+
+## D19. Revealing an encrypted field is audited
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** D8 records changes, logins and denials, not reads. For Aadhaar and income, who looked matters as much as who changed it.
+- **Decision:** `reveal()` checks the permission first, then writes a `view_sensitive` audit event naming the field (never the value), in the same transaction, before returning the value. The admin shows only the masked value and a "Reveal (audited)" link to a page that calls `reveal()`.
+- **Alternatives:** Auditing every view of a student page, which would bury the important events in noise.
+- **Consequences:** Every future screen, export or API that shows a sensitive value must go through `reveal()`. Reviewers treat direct use of `crypto.decrypt` outside the students app as a review flag.
+
+## D20. Per-college student settings with Tamil Nadu defaults
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Reservation categories, quotas, required admission documents and roll number formats differ between colleges and states. D1 and D13 say such differences are data.
+- **Decision:**
+  - `College.config["students"]` holds `communities`, `quotas`, `required_documents` (each a list of `[code, label]`), `roll_number_pattern` and `consent_notice_version`. `apps/students/config.py` documents each key and holds the default.
+  - Defaults are Tamil Nadu's: communities OC, BC, BC(M), MBC and DNC, SC, SC(A) and ST; quotas government (counselling) and management; and the usual transfer certificate, mark sheets and community certificate.
+  - Community and quota are plain text columns checked against the college's list on every save, not database choices, so changing a list needs no migration. Admin forms offer the college's own list.
+  - Lateral entry is an admission type, not a quota.
+  - The 7.5% preferential reservation for government school students is a yes/no field on the student, because it also decides some state scholarships.
+- **Alternatives:** Database choices on the model (a migration for every list change, and the same list for every college); a table per list (more admin screens for values that rarely change).
+- **Consequences:** Removing a code from a college's list makes existing students with that code fail validation on their next save, so a code should be renamed with a data fix, not just removed.
