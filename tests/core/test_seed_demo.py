@@ -10,6 +10,7 @@ from apps.academics.models import AcademicYear, Course, Department, Programme, S
 from apps.accounts.models import User
 from apps.accounts.roles import Role
 from apps.audit.models import AuditEvent
+from apps.students.models import Batch, Section
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
 
@@ -25,7 +26,7 @@ def seed(*args):
 def counts():
     return {
         model.__name__: model.all_colleges.count()
-        for model in (Department, Programme, Course, AcademicYear, Semester)
+        for model in (Department, Programme, Course, AcademicYear, Semester, Batch, Section)
     } | {"users": User.objects.count(), "colleges": College.objects.count()}
 
 
@@ -58,6 +59,8 @@ def test_creates_academic_structure():
         assert Course.objects.count() == 6
         assert AcademicYear.objects.get(is_current=True).label == "2026-27"
         assert Semester.objects.get(is_current=True).term == "odd"
+        assert sorted(Batch.objects.values_list("label", flat=True)) == ["2026-2030"] * 2
+        assert Section.objects.count() == 4
 
 
 def test_demo_users_can_log_in_on_their_college_only(client):

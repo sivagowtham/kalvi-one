@@ -25,6 +25,8 @@ How to use this file:
 | D13 | Per-college configuration in a JSON field, rare needs as per-college feature flags | Accepted |
 | D14 | HOD permissions stop at their own department, checked per object | Accepted |
 | D15 | Minimal academic core: Course is a subject in one programme, regulation is text | Accepted |
+| D16 | Students and Admissions is the first domain module, built before the staff survey results | Accepted |
+| D17 | A batch is one programme's intake in one year; sections belong to a batch and placement is recorded per term | Accepted |
 
 ---
 
@@ -191,3 +193,30 @@ How to use this file:
   - Viewing is open to principal, HOD, faculty, office and exam cell. Structure (years, terms, departments, programmes) is changed by the principal. Courses are changed by the principal or the department's HOD.
 - **Alternatives:** A full curriculum model now, with shared and elective courses across programmes and regulation versions. It was deferred until the staff interviews describe real practice.
 - **Consequences:** A course shared by two programmes is two rows until the curriculum module adds a mapping. Students, enrolment, marks, attendance and fees build on these models later.
+
+## D16. Students and Admissions is the first domain module
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (Gowtham chose to start now, and approved the module plan with its defaults)
+- **Context:** The foundation is merged. The staff survey at PIE Tech and PCAS is still running, but attendance, exams and fees all need students first, and the basics of a Tamil Nadu student record are standard.
+- **Decision:**
+  - Build Students and Admissions now, in two apps: `students` (batch, section, student, guardian, consent, semester enrolment) and `admissions` (intake, application). Admissions depends on students, never the reverse, so a college can import students without using admissions.
+  - Office staff use Django admin plus three custom admin pages: enrol an applicant, promote a batch, and import from Excel. A proper staff interface gets its own plan after the survey.
+  - Not in this module: fees, attendance, marks, certificates, a public online application form, document uploads and parent logins.
+  - Survey answers are expected to change configuration and details, not the structure.
+- **Alternatives:** Wait for the survey and build what staff rank highest. That avoids rework, but leaves every later module without students.
+- **Consequences:** CLAUDE.md and the README now say the first domain module is in progress. Other domain modules still need an approved plan.
+
+## D17. Batches, sections and per-term placement
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Tamil Nadu colleges group students by the year they joined a programme ("2026 batch"), split them into sections, and sometimes reshuffle sections, for example after first year. Lateral entry students join the second year of an existing batch.
+- **Decision:**
+  - `Batch` is one programme's intake in one academic year, unique per programme and year. Its label (2026-2030) is filled in from the programme's duration, and its regulation is copied from the programme but can be changed, because regulations change by batch.
+  - `Section` belongs to a batch (A, B, C), with an optional capacity.
+  - Which section a student is in, and in which semester, will be recorded per term in `StudentSemester` (PR 3), not on the student, so reshuffles and promotions keep their history.
+  - Lateral entry students join an existing batch at semester 3.
+  - Batches and sections are department-level objects (D14): the principal, the HOD of the programme's department and office staff can add and change them. Only the principal can delete, and protected foreign keys stop a batch or section with students from being deleted.
+- **Alternatives:** Sections fixed on the student record, which is simpler but loses history when sections change; one row per programme semester per term, which duplicates the calendar (rejected in D9 for the same reason).
+- **Consequences:** Class lists for a term are read from `StudentSemester`. A batch that changes regulation mid-course is one edit, recorded in the audit log.

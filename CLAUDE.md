@@ -1,7 +1,7 @@
 # KalviOne: notes for contributors and AI assistants
 
 - KalviOne is a multi-tenant college ERP. Read `docs/decisions.md` before changing architecture, and add a new entry for every new architecture decision in the same PR.
-- Foundation phase only: do not add domain modules (marks, attendance, fees, timetable, admissions) until the brief says so.
+- The foundation is done. Students and Admissions is the first domain module (D16); its plan and schema are agreed. Do not start other domain modules (marks, attendance, fees, timetable) until Gowtham approves a plan for them.
 - One codebase for all colleges (D1). Never branch on a specific college in code; use configuration or a feature flag.
 - Only fake data, everywhere (D10).
 - Tests run on PostgreSQL (D5). Run `make check` before opening a PR. CI must be green.
