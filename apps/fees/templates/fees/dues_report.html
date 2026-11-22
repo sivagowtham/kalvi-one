@@ -12,7 +12,8 @@
 .tile strong { display: block; font-size: 1.125rem; }
 {% endblock %}
 {% block content %}
-<div class="row"><h1>Fee dues</h1><a href="{% url 'fees:collections_report' %}">Collections</a></div>
+<div class="row"><h1>Fee dues</h1><span><a href="{% url 'fees:at_risk' %}">At risk</a> · <a href="{% url 'fees:collections_report' %}">Collections</a></span></div>
+{% include "fees/_ask.html" %}
 <form method="get">
   <div class="filters">
     <div><label for="id_academic_year">Year</label>{{ form.academic_year }}</div>

@@ -9,14 +9,17 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import urlencode
+from django.views.decorators.http import require_POST
 
 from apps.academics.models import AcademicYear
 from apps.accounts.permissions import has_perm, require_perm
 from apps.students.models import Batch, Student
 
+from . import ask, receipts, reminders, reports, risk, tally
 from . import config as fee_config
-from . import receipts, reports, tally
 from .models import (
     ZERO,
     FeeHead,
@@ -269,6 +272,7 @@ def dues_report(request):
             "batch": filters.batch,
             "query": query,
             "can_collect": has_perm(request.user, "fees.collect"),
+            "can_ask": ask.enabled(request.college),
         },
     )
 
@@ -329,7 +333,13 @@ def collections_report(request):
     return render(
         request,
         "fees/collections_report.html",
-        _college(request) | {"form": form, "result": result, "query": request.GET.urlencode()},
+        _college(request)
+        | {
+            "form": form,
+            "result": result,
+            "query": request.GET.urlencode(),
+            "can_ask": ask.enabled(request.college),
+        },
     )
 
 
@@ -381,4 +391,96 @@ def tally_download(request, pk):
 def tally_ledgers(request):
     return _xml_download(
         tally.ledger_file(request.college), f"tally-ledgers-{request.college.code}.xml".lower()
+    )
+
+
+ASK_TARGETS = {
+    "dues": "fees:dues_report",
+    "at_risk": "fees:at_risk",
+    "collections": "fees:collections_report",
+}
+
+
+@require_perm("fees.view_reports")
+@require_POST
+def ask_question(request):
+    """Turn a plain-word question into a report and open it (D32)."""
+    question = request.POST.get("question", "")
+    back = request.POST.get("next") or reverse("fees:dues_report")
+    if not back.startswith("/") or back.startswith("//"):
+        back = reverse("fees:dues_report")
+    if not ask.enabled(request.college):
+        return redirect(back)
+    try:
+        answer = ask.interpret(request.college, question, timezone.localdate())
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+        return redirect(back)
+    if answer.summary:
+        messages.info(request, answer.summary)
+    url = reverse(ASK_TARGETS[answer.report])
+    if answer.report == "dues" and "academic_year" not in answer.params:
+        answer.params["academic_year"] = ""  # every year, not the default current one
+    return redirect(f"{url}?{urlencode(answer.params)}")
+
+
+class RiskForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["batch"] = forms.ModelChoiceField(
+            queryset=Batch.objects.select_related("programme").filter(is_active=True),
+            required=False,
+            empty_label="Every batch",
+        )
+        self.fields["head"] = forms.ModelChoiceField(
+            queryset=FeeHead.objects.all(), required=False, empty_label="Every fee head"
+        )
+
+
+@require_perm("fees.view_reports")
+def at_risk(request):
+    """Students with overdue fees, most at risk first, with the reasons in plain words."""
+    form = RiskForm(request.GET)
+    filters = reports.DuesFilter()
+    if form.is_valid():
+        filters.batch = form.cleaned_data.get("batch")
+        filters.head = form.cleaned_data.get("head")
+    flagged = risk.flags(filters, timezone.localdate())
+    return render(
+        request,
+        "fees/at_risk.html",
+        _college(request)
+        | {
+            "form": form,
+            "flags": flagged[:200],
+            "high": sum(1 for f in flagged if f.level == risk.HIGH),
+            "count": len(flagged),
+            "can_remind": has_perm(request.user, "fees.send_reminder"),
+            "can_ask": ask.enabled(request.college),
+        },
+    )
+
+
+@require_perm("fees.send_reminder")
+def reminder(request, pk):
+    student = get_object_or_404(Student.objects.select_related("batch__programme"), pk=pk)
+    today = timezone.localdate()
+    overdue = [
+        due
+        for due in StudentDue.objects.filter(student=student, due_date__lt=today)
+        if due.balance > 0
+    ]
+    balance = sum((due.balance for due in overdue), ZERO)
+    oldest = min((due.due_date for due in overdue), default=None)
+    return render(
+        request,
+        "fees/reminder.html",
+        _college(request)
+        | {
+            "student": student,
+            "balance": balance,
+            "drafts": reminders.drafts(request.college, student, balance, oldest)
+            if balance
+            else [],
+        },
     )

@@ -9,6 +9,7 @@ input[type=date] { width: 100%; padding: .625rem .5rem; font: inherit; color: in
 {% endblock %}
 {% block content %}
 <div class="row"><h1>Collections</h1><a href="{% url 'fees:dues_report' %}">Dues</a></div>
+{% include "fees/_ask.html" %}
 <form method="get">
   {{ form.non_field_errors }}
   <div class="filters">

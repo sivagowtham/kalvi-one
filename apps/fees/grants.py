@@ -47,3 +47,6 @@ register("fees.view_reports", READERS, "See and download dues and collection rep
 # The daily Tally file (D31).
 register("fees.export_tally", SETUP, "Create and download Tally files of receipts")
 register("fees.view_tallyexport", SETUP, "See which Tally files were made")
+
+# AI features (D32). Reminders are drafted here and sent by staff from their own phone.
+register("fees.send_reminder", [*SETUP, Role.OFFICE], "Draft fee reminders to students")

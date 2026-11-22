@@ -41,6 +41,21 @@ DEFAULTS: dict[str, Any] = {
         ["SPORTS", "Sports concession", "college"],
         ["MGMT", "Management concession", "college"],
     ],
+    # Plain-word questions on the dues pages, answered with Claude (D32). Only the question
+    # and the names of years, batches and fee heads are sent; never student data.
+    "ai_questions": True,
+    # Fee reminders, filled in on our server and sent by staff from their own phone (D32).
+    # Placeholders: {name}, {roll}, {college}, {balance}, {due_date}.
+    "reminder_templates": {
+        "en": (
+            "Dear {name} ({roll}), ₹{balance} of your {college} fees has been due since "
+            "{due_date}. Please pay at the accounts office at the earliest. Thank you."
+        ),
+        "ta": (
+            "அன்புள்ள {name} ({roll}), உங்கள் {college} கல்லூரிக் கட்டணத்தில் ₹{balance} "
+            "{due_date} முதல் நிலுவையில் உள்ளது. விரைவில் கணக்கு அலுவலகத்தில் செலுத்தவும். நன்றி."
+        ),
+    },
 }
 
 FUNDERS = {"government", "college"}
