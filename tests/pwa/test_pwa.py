@@ -1,4 +1,4 @@
-"""KalviOne installs on phones as an app (D26)."""
+"""KalviOne installs on phones as an app (D33)."""
 
 import pytest
 

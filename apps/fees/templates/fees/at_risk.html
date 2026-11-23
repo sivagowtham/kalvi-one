@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Fees at risk{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0 .75rem; }
+{% endblock %}
+{% block content %}
+<div class="row"><h1>Fees at risk</h1><a href="{% url 'fees:dues_report' %}">Dues</a></div>
+{% include "fees/_ask.html" %}
+<form method="get">
+  <div class="filters">
+    <div><label for="id_batch">Batch</label>{{ form.batch }}</div>
+    <div><label for="id_head">Fee head</label>{{ form.head }}</div>
+  </div>
+  <div class="actions"><button type="submit">Show</button></div>
+</form>
+<p class="muted">{{ count }} student(s) have overdue fees; {{ high }} need a call first. Worked out from dues and receipts on our own server.</p>
+<ul class="list">
+  {% for flag in flags %}
+    <li>
+      <div class="row"><span><strong>{{ flag.roll_number }}</strong> · {{ flag.name }}
+        <span class="badge {{ flag.level }}">{% if flag.level == "high" %}Call first{% else %}Watch{% endif %}</span></span>
+        <span class="amount">₹{{ flag.overdue|inr }}</span></div>
+      <ul class="reasons">{% for reason in flag.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+      {% if can_remind %}<a href="{% url 'fees:reminder' flag.student_id %}">Draft a reminder</a>{% endif %}
+    </li>
+  {% empty %}
+    <li class="muted">Nobody has overdue fees here.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

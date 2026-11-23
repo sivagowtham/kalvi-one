@@ -4,6 +4,9 @@
 <h1>Welcome, {{ user.get_short_name }}</h1>
 {% if roles %}<p class="muted">Signed in as {{ user.username }} · {{ roles|join:", " }}</p>{% endif %}
 <ul>
+  {% if can_collect_fees %}<li><a href="{% url 'fees:collect' %}">Take a fee payment</a></li>{% endif %}
+  {% if can_export_tally %}<li><a href="{% url 'fees:tally' %}">Send receipts to Tally</a></li>{% endif %}
+  {% if can_see_fee_reports %}<li><a href="{% url 'fees:dues_report' %}">Fee dues and collections</a></li>{% endif %}
   {% if can_open_admin %}<li><a href="{% url 'admin:index' %}">Open the office workspace</a></li>{% endif %}
   <li><a href="{% url 'accounts:password_change' %}">Change your password</a></li>
 </ul>

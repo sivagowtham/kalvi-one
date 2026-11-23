@@ -1,4 +1,4 @@
-"""Files that make KalviOne installable on phones as an app (D26).
+"""Files that make KalviOne installable on phones as an app (D33).
 
 All of these are public: the browser fetches them before anyone signs in. None of them
 contains college data beyond the college's name, which the login page already shows.

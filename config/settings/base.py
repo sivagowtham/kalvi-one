@@ -25,6 +25,11 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 FIELD_ENCRYPTION_KEYS = env.list("FIELD_ENCRYPTION_KEYS", default=[])
 FIELD_HASH_KEY = env("FIELD_HASH_KEY", default="")
 
+# Claude, for AI features (D32). Without a key the AI features are hidden; nothing else changes.
+# The model is a setting per feature so it can be swapped without a code change.
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+FEES_AI_MODEL = env("FEES_AI_MODEL", default="claude-haiku-5-5")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -40,6 +45,7 @@ INSTALLED_APPS = [
     "apps.academics",
     "apps.students",
     "apps.admissions",
+    "apps.fees",
     "apps.pwa",
 ]
 

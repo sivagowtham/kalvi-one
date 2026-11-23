@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Tally file{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}{% endblock %}
+{% block content %}
+<h1>Send receipts to Tally</h1>
+{% if company %}<p class="muted">For the Tally company “{{ company }}”.</p>{% endif %}
+<p>Not yet sent: <strong>{{ pending_receipts }}</strong> receipt{{ pending_receipts|pluralize }} (₹{{ pending_total|inr }}){% if pending_cancellations %} and <strong>{{ pending_cancellations }}</strong> cancellation{{ pending_cancellations|pluralize }}{% endif %}, up to {{ today|date:"d M Y" }}.</p>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="full"{% if not pending_receipts and not pending_cancellations %} disabled{% endif %}>Make today's Tally file</button>
+</form>
+<p class="muted">Each receipt goes into one file only. In Tally, open the company, then Import › Transactions (Tally Prime) or Gateway of Tally › Import Data › Vouchers (Tally ERP 9), and choose the file.</p>
+
+<h2 style="font-size:1rem;margin-top:1.5rem">Files made</h2>
+<ul class="list">
+  {% for export in exports %}
+    <li class="row"><span>{{ export.created_at|date:"d M Y, H:i" }} · {{ export.receipts }} receipt{{ export.receipts|pluralize }}{% if export.cancellations %}, {{ export.cancellations }} cancelled{% endif %} · ₹{{ export.total|inr }}<br><span class="muted">by {{ export.created_by.get_full_name|default:export.created_by.username }}</span></span>
+      <a href="{% url 'fees:tally_download' export.pk %}">Download</a></li>
+  {% empty %}
+    <li class="muted">No files yet.</li>
+  {% endfor %}
+</ul>
+<p class="muted">Missing ledgers in Tally? <a href="{% url 'fees:tally_ledgers' %}">Download the ledger list</a> and import it under Masters first. Ledgers that already exist are left as they are.</p>
+{% endblock %}

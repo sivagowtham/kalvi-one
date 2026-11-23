@@ -1,0 +1,13 @@
+{% if can_ask %}
+<form method="post" action="{% url 'fees:ask' %}" class="ask">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.path }}">
+  <label for="id_question">Ask in plain words</label>
+  <div class="ask-row">
+    <input type="search" name="question" id="id_question" maxlength="300" required
+           placeholder="e.g. Who in 2nd year CSE has overdue tuition fees?">
+    <button type="submit">Ask</button>
+  </div>
+  <p class="muted small">Only your question and the names of batches and fee heads go to the AI. Leave out student names and numbers.</p>
+</form>
+{% endif %}

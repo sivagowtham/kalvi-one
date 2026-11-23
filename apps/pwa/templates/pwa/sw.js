@@ -1,4 +1,4 @@
-// KalviOne service worker (decision D26).
+// KalviOne service worker (decision D33).
 // Pages hold personal data, so they are never cached: every page comes from the network.
 // Only the offline page and the app icons are kept, so the app can say "no network"
 // instead of showing the browser's error.
