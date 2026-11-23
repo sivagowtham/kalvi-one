@@ -35,6 +35,7 @@ How to use this file:
 | D23 | Each college has its own login page; logins pause after repeated wrong passwords, counted from the audit log | Accepted |
 | D24 | Forgotten passwords are reset through a one-time emailed link on the college's own address; the reply never says whether an account exists | Accepted |
 | D25 | New accounts get an invite email with a 7-day link to choose their first password, sent from admin or a command | Accepted |
+| D26 | The Android app reuses the web screens: an installable PWA first, then a thin Capacitor shell for the Play Store; pages are never cached on the phone | Proposed |
 
 ---
 
@@ -348,3 +349,16 @@ How to use this file:
   - Emails sent outside a request build the link from `COLLEGE_URL_TEMPLATE` (for example `https://{slug}.kalvione.in`), so they always point at the college's own address.
 - **Alternatives:** Sending invites automatically on enrolment or import (easy to add later, but colleges may want to check the data first); temporary passwords printed on a slip (they get shared and never changed).
 - **Consequences:** `COLLEGE_URL_TEMPLATE` must be set correctly in each deployment. A large college sends hundreds of emails in one run, so the mail provider's sending limits apply; a background queue can come later.
+
+## D26. Android app: installable web app first, then a thin store shell
+
+- **Date:** 2026-11-23
+- **Status:** Proposed (step 1 built; the store shell waits for Gowtham's go)
+- **Context:** Gowtham wants an Android app. Most staff use phones. Every KalviOne screen is a server-rendered Django page, there is no JSON API, and there is no live server yet.
+- **Decision:**
+  - Step 1: KalviOne is an installable Progressive Web App. Each college's host serves its own `/manifest.webmanifest` (named after the college), a service worker at `/sw.js`, an `/offline/` page and the app icons under `/app/icons/`. All are `@public` and hold nothing beyond the college's name.
+  - The service worker never caches pages or API responses, because they hold personal data (D18). It only keeps the offline page and the icons, and shows the offline page when a page cannot load.
+  - Step 2 (proposed): one Play Store app built with Capacitor in `android/`, loading the college's own address. On first launch the user picks their college. The shell adds push notifications, the camera for document scanning and fingerprint unlock. New web screens appear in the app with no extra work.
+  - A JSON API is added only for screens that need it, such as offline attendance marking.
+- **Alternatives:** Flutter or React Native (every screen built twice, plus a full API first); a Trusted Web Activity wrapper (each new college's address must be added to the app and a new version shipped, and there are no native plugins).
+- **Consequences:** Icons are served by a Django view because production has no static file server yet. Bump `CACHE_VERSION` in `apps/pwa/views.py` whenever `sw.js` or the offline page changes. The store app needs a live HTTPS server and a Google Play developer account.

@@ -8,5 +8,6 @@ urlpatterns = [
     path("", home, name="home"),
     path("", include("apps.accounts.urls")),
     path("health/", health, name="health"),
+    path("", include("apps.pwa.urls")),
     path("admin/", admin.site.urls),
 ]
