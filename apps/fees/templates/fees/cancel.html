@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Cancel receipt {{ receipt.number }}{% endblock %}
+{% block content %}
+<h1>Cancel receipt {{ receipt.number }}</h1>
+<p>₹{{ receipt.amount|inr }} from {{ receipt.student.roll_number }} on {{ receipt.date|date:"d M Y" }}. The amount goes back onto the student's dues. This cannot be undone.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <label for="{{ form.reason.id_for_label }}">Reason</label>
+  {{ form.reason }}
+  {{ form.reason.errors }}
+  <button type="submit" class="full">Cancel the receipt</button>
+</form>
+<p class="muted"><a href="{% url 'fees:receipt' receipt.pk %}">Keep the receipt</a></p>
+{% endblock %}

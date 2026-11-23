@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Fee collections{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; }
+input[type=date] { width: 100%; padding: .625rem .5rem; font: inherit; color: inherit; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; }
+{% endblock %}
+{% block content %}
+<div class="row"><h1>Collections</h1><a href="{% url 'fees:dues_report' %}">Dues</a></div>
+{% include "fees/_ask.html" %}
+<form method="get">
+  {{ form.non_field_errors }}
+  <div class="filters">
+    <div><label for="id_start">From</label>{{ form.start }}</div>
+    <div><label for="id_end">To</label>{{ form.end }}</div>
+  </div>
+  <div class="actions"><button type="submit">Show</button>
+    {% if result %}<a class="button secondary" href="?{{ query }}{% if query %}&amp;{% endif %}format=xlsx">Download Excel</a>{% endif %}</div>
+</form>
+{% if result %}
+  <p class="row"><span>{{ result.count }} receipt{{ result.count|pluralize }}{% if result.cancelled %} · {{ result.cancelled }} cancelled, not counted{% endif %}</span><span class="total amount">₹{{ result.total|inr }}</span></p>
+  <table>
+    <tr><th>Date</th><th>Mode</th><th class="right">Receipts</th><th class="right">₹</th></tr>
+    {% for row in result.by_day %}
+      <tr><td>{{ row.date|date:"d M" }}</td><td>{{ row.mode_label }}</td><td class="right">{{ row.count }}</td><td class="right amount">{{ row.amount|inr }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="muted">No receipts in these dates.</td></tr>{% endfor %}
+  </table>
+  {% if result.by_head %}
+  <table>
+    <tr><th>Fee head</th><th class="right">₹</th></tr>
+    {% for row in result.by_head %}
+      <tr><td>{{ row.head__name }}</td><td class="right amount">{{ row.amount|inr }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+{% endif %}
+{% endblock %}

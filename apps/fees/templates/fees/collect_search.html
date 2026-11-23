@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Take a payment{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}{% endblock %}
+{% block content %}
+<h1>Take a payment</h1>
+<form method="get">
+  <label for="q">Roll number or name</label>
+  <input type="search" id="q" name="q" value="{{ query }}" autofocus autocomplete="off" inputmode="search">
+  <button type="submit" class="full">Find student</button>
+</form>
+{% if query %}
+  {% if students %}
+    <ul class="list">
+      {% for student in students %}
+        <li><a href="{% url 'fees:collect_student' student.pk %}"><strong>{{ student.roll_number }}</strong> · {{ student.display_name }}<br><span class="muted">{{ student.batch }}</span></a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No student matches “{{ query }}”.</p>
+  {% endif %}
+{% endif %}
+<p class="muted"><a href="{% url 'home' %}">Home</a></p>
+{% endblock %}

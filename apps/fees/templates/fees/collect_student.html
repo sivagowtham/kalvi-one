@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}{{ student.roll_number }} · fees{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'fees:collect' %}">← Find another student</a></p>
+<h1>{{ student.display_name }}</h1>
+<p class="muted">{{ student.roll_number }} · {{ student.batch }}</p>
+
+{% for group in groups %}
+  <section class="instalment">
+    <div class="row"><h2>{{ group.label }} <span class="muted">{{ group.year }}</span></h2>
+      <span class="muted">due {{ group.due_date|date:"d M Y" }}</span></div>
+    <table>
+      <tr><th>Fee</th><th class="right">To pay</th><th class="right">Paid</th><th class="right">Left</th></tr>
+      {% for due in group.dues %}
+        <tr><td>{{ due.head }}{% if due.reduction %}<br><span class="muted">less concession ₹{{ due.reduction|inr }}</span>{% endif %}</td>
+          <td class="right amount">{{ due.payable|inr }}</td>
+          <td class="right amount">{{ due.paid|inr }}</td>
+          <td class="right amount">{{ due.balance|inr }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+{% empty %}
+  <p class="muted">No dues have been raised for this student.</p>
+{% endfor %}
+
+<p class="row"><span>Total left to pay</span><span class="total amount">₹{{ owed|inr }}</span></p>
+
+{% if owed %}
+<form method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}
+    {{ field.errors }}
+  {% endfor %}
+  <p class="muted">The oldest dues are paid first.</p>
+  <button type="submit" class="full">Save and print receipt</button>
+</form>
+{% endif %}
+
+{% if recent %}
+  <h2 style="font-size:1rem;margin-top:1.5rem">Recent receipts</h2>
+  <ul class="list">
+    {% for receipt in recent %}
+      <li><a href="{% url 'fees:receipt' receipt.pk %}">{{ receipt.number }} · ₹{{ receipt.amount|inr }} · {{ receipt.date|date:"d M Y" }}{% if receipt.is_cancelled %} · cancelled{% endif %}</a></li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

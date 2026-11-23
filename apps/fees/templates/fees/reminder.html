@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Fee reminder{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}{% endblock %}
+{% block content %}
+<div class="row"><h1>Fee reminder</h1><a href="{% url 'fees:at_risk' %}">At risk</a></div>
+<p><strong>{{ student.roll_number }}</strong> · {{ student.name }} · {{ student.batch }}</p>
+{% if drafts %}
+  <p>Overdue: <span class="amount">₹{{ balance|inr }}</span></p>
+  {% for draft in drafts %}
+    <h2 style="font-size:1rem;margin-top:1.25rem">{{ draft.label }}</h2>
+    <div class="draft" id="draft-{{ draft.code }}">{{ draft.text }}</div>
+    <div class="actions">
+      {% if draft.whatsapp %}<a class="button" href="{{ draft.whatsapp }}" target="_blank" rel="noopener">Open in WhatsApp</a>{% endif %}
+      <button type="button" class="secondary" data-copy="draft-{{ draft.code }}">Copy</button>
+    </div>
+  {% endfor %}
+  {% if not student.mobile %}<p class="muted">No mobile number on record; copy the message instead.</p>{% endif %}
+  <p class="muted small">Sent from your own phone. KalviOne does not send anything itself.</p>
+  <script>
+    document.querySelectorAll("[data-copy]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var text = document.getElementById(button.dataset.copy).textContent;
+        if (navigator.clipboard) { navigator.clipboard.writeText(text); button.textContent = "Copied"; }
+      });
+    });
+  </script>
+{% else %}
+  <p class="muted">Nothing is overdue for this student.</p>
+{% endif %}
+{% endblock %}

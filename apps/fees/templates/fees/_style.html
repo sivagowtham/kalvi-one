@@ -1,0 +1,31 @@
+.list { list-style: none; padding: 0; margin: 1rem 0 0; }
+.list li { border-top: 1px solid var(--line); padding: .75rem 0; }
+.list a { display: block; text-decoration: none; }
+.amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.right { text-align: right; }
+table { width: 100%; border-collapse: collapse; margin: .5rem 0; }
+th, td { padding: .375rem .25rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { text-align: left; font-size: .875rem; color: var(--muted); font-weight: 600; }
+.instalment { margin-top: 1rem; }
+.instalment h2 { font-size: 1rem; margin: 0; }
+.total { font-size: 1.25rem; font-weight: 700; }
+.stamp { color: var(--error); font-weight: 700; border: 2px solid var(--error); border-radius: 8px;
+         padding: .25rem .5rem; display: inline-block; }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.actions .button, .actions button { flex: 1 1 10rem; text-align: center; }
+.secondary { background: var(--bg) !important; color: var(--accent) !important; border: 1px solid var(--line) !important; }
+.ask { margin: 0 0 1rem; }
+.ask-row { display: flex; gap: .5rem; }
+.ask-row input { flex: 1; min-width: 0; }
+.small { font-size: .8125rem; margin: .25rem 0 0; }
+.badge { font-size: .75rem; font-weight: 700; border-radius: 999px; padding: .125rem .5rem; border: 1px solid currentColor; }
+.badge.high { color: var(--error); }
+.badge.watch { color: var(--muted); }
+.reasons { margin: .25rem 0 0; padding-left: 1.125rem; color: var(--muted); font-size: .875rem; }
+.draft { white-space: pre-wrap; border: 1px solid var(--line); border-radius: 8px; padding: .75rem; margin: .5rem 0; }
+@media print {
+  body { background: #fff; color: #000; }
+  main { margin: 0; max-width: none; }
+  .card { border: 0; padding: 0; }
+  .no-print, .messages { display: none !important; }
+}

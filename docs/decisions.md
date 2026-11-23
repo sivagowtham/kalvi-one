@@ -35,6 +35,12 @@ How to use this file:
 | D23 | Each college has its own login page; logins pause after repeated wrong passwords, counted from the audit log | Accepted |
 | D24 | Forgotten passwords are reset through a one-time emailed link on the college's own address; the reply never says whether an account exists | Accepted |
 | D25 | New accounts get an invite email with a 7-day link to choose their first password, sent from admin or a command | Accepted |
+| D26 | Fees is the second domain module; Tally gets a daily XML file of receipt vouchers first, live sync later | Accepted |
+| D27 | Fee heads carry their Tally ledger and GST rate; a fee structure is one batch's year, split into instalments | Accepted |
+| D28 | Dues are raised per student, head and instalment; concessions count once the principal approves, split into college and government shares | Accepted |
+| D29 | Receipts are taken on a phone-first counter page, settle the oldest dues first, are numbered per financial year and are cancelled, never deleted | Accepted |
+| D30 | Dues and collection reports are phone-friendly pages with Excel downloads; the admissions fee tick box stays for now | Accepted |
+| D31 | The Tally file holds each receipt once, as a Receipt voucher in Tally's own import XML; cancellations follow as Cancel vouchers | Accepted |
 
 ---
 
@@ -348,3 +354,107 @@ How to use this file:
   - Emails sent outside a request build the link from `COLLEGE_URL_TEMPLATE` (for example `https://{slug}.kalvione.in`), so they always point at the college's own address.
 - **Alternatives:** Sending invites automatically on enrolment or import (easy to add later, but colleges may want to check the data first); temporary passwords printed on a slip (they get shared and never changed).
 - **Consequences:** `COLLEGE_URL_TEMPLATE` must be set correctly in each deployment. A large college sends hundreds of emails in one run, so the mail provider's sending limits apply; a background queue can come later.
+
+## D26. Fees is the second domain module, with a daily Tally file first
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (Gowtham approved the module plan with its defaults; changes may follow from the accountants and colleges)
+- **Context:** Fees is the module colleges ask about first after students, and most Tamil Nadu colleges keep their accounts in Tally (Prime, or the older ERP 9). Accountants should not have to type each fee receipt into Tally a second time.
+- **Decision:**
+  - Build Fees now as one app, `fees`, in six small pull requests: fee heads, payment accounts and structures; concessions, scholarships and student dues; receipts on a phone-first screen, printing and cancelling; dues reports and the admissions fee check; the daily Tally file; and AI help (dues-risk flags, plain-word questions and reminder drafts).
+  - Tally integration starts as a daily XML file of that day's receipts as Receipt vouchers, which the accountant imports into Tally. A receipt goes into a downloaded file only once. Live sync through Tally's own XML port is a later phase.
+  - The accounts role takes payments and downloads the Tally file. Only the principal approves concessions and cancels receipts. Office staff and HODs can see fee set-up and dues.
+  - Most college fees are exempt from GST, so every fee head is exempt unless it is given a rate.
+  - One Tally ledger per fee head, not per student.
+  - Not in this module yet: online payment links or a gateway, live Tally sync, late fines and refunds.
+  - AI features never send student names, numbers, amounts or sensitive fields to an AI service. Dues-risk flags are worked out on our own server.
+- **Alternatives:** Live Tally sync first (needs Tally running and reachable from our server at every college, which is rare on day one); a CSV for the accountant to key in (still double entry).
+- **Consequences:** Every fee head and payment account needs its Tally ledger name spelt as it is in Tally. A ledger list file will let the accountant create missing ledgers in one import.
+
+## D27. Fee heads, payment accounts and fee structures
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Colleges charge the same kinds of fee (tuition, development, exam, hostel, bus) but in different amounts per batch, year, quota and hostel or day scholar, usually in two or more instalments.
+- **Decision:**
+  - `FeeHead` is one kind of fee with a code, the name printed on receipts, its Tally ledger name, a GST rate (0 to 40, default 0) and, for taxable heads, an HSN or SAC code.
+  - `PaymentAccount` is where money is received: a cash counter or a bank account, each with its Tally ledger name. A college can have several bank accounts.
+  - `FeeStructure` is what one batch pays in one academic year. It can be limited to one quota and to hostel or day scholars; blank means all. When several structures fit a student, the most specific one applies (quota and residence each count once). The year of study is worked out from the batch's admission year and must fall inside the programme's duration.
+  - A structure has `Instalment`s (number, label, due date) and `FeeStructureLine`s (instalment number, fee head, amount). The admin edits both on one page and refuses an amount for an instalment that is not set up.
+  - `College.config["fees"]` holds the Tally company name, the GST output ledgers, the receipt number pattern and the month the financial year starts, documented in `apps/fees/config.py`.
+  - The principal and accounts set up fees; office staff and HODs can only see them. Fee heads in use cannot be deleted.
+- **Alternatives:** One amount per head per year with no instalments (does not match how colleges collect); a structure per student (too much data entry); fee heads as a config list instead of rows (receipts and Tally need a stable row to point at).
+- **Consequences:** Next year's fees are a new structure, so old receipts always point at the amounts that applied then. Copying a structure to a new year can be added when the accountants ask for it.
+
+## D28. Student dues and concessions
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Students owe different amounts once scholarships and concessions are taken off. Tamil Nadu has several government scholarships (Post-Matric for SC, SCA and ST students, first graduate, the 7.5% government school scheme, and BC, MBC and DNC scholarships) that the student does not pay but the college must still collect from the government. Colleges also give their own concessions (merit, staff ward, sports, management).
+- **Decision:**
+  - `StudentDue` is one row per student, fee head and instalment for an academic year, copied from the student's fee structure with its label and due date. It keeps the amount, `waived` (the college's concession), `govt_share` (expected from a government scholarship) and `paid`. What the student pays is amount minus waived minus the government share, and the database refuses a row where those and `paid` add up to more than the amount.
+  - Dues are raised for a whole batch from the fee structure list ("Raise dues"), by the principal or accounts. It picks each studying student's most specific structure (quota first, then residence), skips students no structure fits and lists them, and never changes dues that already exist, so it can be run again for students who join late.
+  - `Concession` belongs to a student and an academic year. Its type comes from `College.config["fees"]["concession_types"]` (Tamil Nadu defaults), and each type says whether the government or the college pays. That is copied onto the concession, so a later config change does not rewrite history. A concession is a percentage (of one head or all heads) or a fixed amount for one head, taken from the earliest instalments first.
+  - Office and accounts enter concessions; only the principal approves, rejects or withdraws them. Only approved concessions count. Each decision works the shares out again from scratch, and a due is never reduced below what has been paid on it. What no longer fits is shown as a warning, because it needs a refund or an adjustment by hand.
+  - Dues cannot be added, changed or deleted by hand in the admin. Concessions are never deleted; they are rejected or withdrawn.
+- **Alternatives:** Working dues out on the fly from structures and concessions every time (simple to store, but slow for reports and it would change old dues when a structure is edited); one due row per student per instalment with heads in JSON (harder to post per head to Tally).
+- **Consequences:** Changing a structure after dues are raised does not change those dues; that needs a correction tool, to be added when accountants ask. The government share is the basis for a "receivable from government" report in step 4.
+
+## D29. Receipts on a phone-first counter page
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** Most accounts staff work from a phone (Gowtham, 2026-11-22). They need to find a student, see what is owed, take cash, UPI, card, bank transfer, cheque or DD, and hand over or share a receipt, all on a small screen. Receipt numbers must never repeat, and the Tally file (step 5) needs fee head amounts and GST per receipt.
+- **Decision:**
+  - The fee counter has its own pages outside the admin, using the shared base template: `/fees/collect/` (search by roll number or name; one match opens straight away), `/fees/collect/<student>/` (dues per instalment, then the payment form), `/fees/receipts/<id>/` (the printable receipt, which also saves as PDF from the phone's print menu) and `/fees/receipts/<id>/cancel/`. The home page links to the counter for users who may collect.
+  - `fees.collect` (principal and accounts) takes payments; `fees.view_receipt` (also office and HODs) opens and prints receipts; `fees.cancel_receipt` is the principal's alone.
+  - `receipts.collect()` locks the student's dues, refuses more than is owed (no advance payments yet), and settles the oldest dues first: by due date, then instalment, then the fee head's print order. Each `ReceiptLine` points at the due it paid.
+  - Cash goes to a cash account and every other mode to a bank account. Every mode except cash needs a reference number, which the database also checks.
+  - Numbers come from `College.config["fees"]["receipt_number_pattern"]` (default `{code}/{fy}/{seq:06}`, for example `PIE/2026-27/000123`), with a separate counter per financial year. The financial year starts in the configured month (April). The students module's locked `NumberCounter` is reused, so two counters never get the same number.
+  - The receipt date is always the day it is saved. Backdated receipts are not allowed, so the daily Tally file for a day can only gain receipts on that day.
+  - Fee amounts include GST. On a taxable head the line keeps the taxable value, CGST and SGST, rounded to the paisa, and the database checks that they add up to the amount.
+  - Receipts are never deleted or edited. Cancelling needs a reason, puts each line's amount back on its due, and keeps the receipt marked as cancelled.
+  - Amounts are shown with Indian digit grouping (1,23,456.00), and in words with lakh and crore.
+- **Alternatives:** Taking payments inside the Django admin (unusable on a phone); letting the cashier choose which dues to pay (more taps, and more mistakes at a busy counter; can be added later); a separate receipt number table (the existing locked counter already does this).
+- **Consequences:** A student who overpays or wants to pay in advance cannot yet; refunds and advances need their own change. Sharing on WhatsApp is done by saving the receipt as a PDF from the phone for now.
+
+## D30. Dues and collection reports
+
+- **Date:** 2026-11-22
+- **Status:** Accepted
+- **Context:** The principal and accounts office need to see what is still owed (by batch, fee head and overdue), what has been collected each day by mode and fee head, and what is expected from government scholarships. Accountants also want the same figures in Excel.
+- **Decision:**
+  - `/fees/reports/dues/` shows totals to collect, collected, left and expected from government, then one row per batch with how many students still owe. Filters are academic year (current by default), batch, fee head and "only what is overdue today". Choosing a batch lists its students who owe, largest balance first; users who can collect get a link to the counter page for each.
+  - `/fees/reports/collections/` shows valid receipts between two dates (today by default, at most a year) per day and mode, and per fee head with CGST and SGST. Cancelled receipts are counted separately and left out of the totals.
+  - Both pages download as Excel (openpyxl) with the same filters. The students sheet includes mobile numbers for follow-up calls and nothing from the encrypted fields.
+  - `fees.view_reports` goes to everyone who can see dues: principal, accounts, office and HODs.
+  - Totals are worked out in the database from `StudentDue` and `Receipt`, not stored.
+  - The admissions "fee paid" tick box stays. Applicants pay before they are students, and receipts belong to students (D29), so a real check needs receipts for applicants. That is left until colleges say how they take admission fees.
+- **Alternatives:** Stored daily totals (faster at large scale, but one more thing to keep right); a report builder (too much for the first version, and the AI questions in step 6 cover ad hoc needs).
+- **Consequences:** D21's note that the fees module will replace the tick box is postponed, not dropped.
+
+## D31. The daily Tally file
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (Gowtham chose a daily file first; D26)
+- **Context:** The accountant imports fee receipts into Tally Prime or Tally ERP 9 once a day. A receipt typed twice, or missed, breaks the books, and Tally's own XML import is the one format both versions read.
+- **Decision:**
+  - `/fees/tally/` (principal and accounts, `fees.export_tally`) shows how many receipts and cancellations have not been sent, and makes a file of all of them up to today. A `TallyExport` row records each file, and each receipt points at the file that carried it (`tally_export`) and, once cancelled, the file that carried the cancellation (`tally_cancel_export`). So a receipt is sent once, and any earlier file can be downloaded again with exactly the same vouchers.
+  - Each receipt is a Receipt voucher (the type name is `tally_voucher_type` in config, default "Receipt") with the receipt number as voucher number, the payment reference, and a narration of receipt number, roll number, name and payment mode. No encrypted or sensitive field ever goes in. The cash or bank ledger is debited with the total. Each fee head's ledger is credited with its taxable value, and CGST and SGST go to the ledgers named in config. The file is refused if any voucher does not add up.
+  - A voucher carries `REMOTEID` `kalvione-<college code>-receipt-<id>` for a later live sync. A cancellation is a voucher with `ACTION="Cancel"` that names the date, type and voucher number, as Tally's integration guide shows. A receipt cancelled before it was ever sent is never sent at all.
+  - `/fees/tally/ledgers.xml` lists every ledger the vouchers use, under the Tally groups in config (fees under Direct Incomes, cash under Cash-in-Hand, banks under Bank Accounts, and GST ledgers under Duties & Taxes with their duty head). The accountant imports it once to create missing ledgers. Tally leaves existing ones as they are.
+  - The file names the Tally company when `tally_company` is set, so Tally refuses it if the wrong company is open.
+- **Alternatives:** One file per calendar day with no record of what was sent (a lost or repeated download would miss or double receipts); Tally's ODBC or HTTP port (needs Tally running and reachable from our server; the later phase); a CSV with a Tally add-on (one more tool for each college to install).
+- **Consequences:** In Tally, the receipt voucher type should use manual numbering so KalviOne's numbers are kept, and ledger names must match exactly. Bank allocation details (instrument numbers per bank entry) are not sent yet; the reference is in the narration and the reference field.
+
+## D32. AI in the fees module: risk flags, plain-word questions, reminder drafts
+
+- **Date:** 2026-11-22
+- **Status:** Accepted (part of the fees plan Gowtham approved; D26)
+- **Context:** AI up front is KalviOne's difference from other ERPs, but fee data is personal and the accounts office needs answers it can trust. The numbers must come from our own database, and student data must not leave our server.
+- **Decision:**
+  - **Risk flags** (`apps/fees/risk.py`, `/fees/reports/at-risk/`, `fees.view_reports`) are worked out on our server with plain rules, not a model: how much is overdue and for how long, instalments missed, arrears from an earlier year, no payment yet or none in 60 days, and more than half the fees overdue. Each student gets a score and the reasons in plain words; "Call first" from 4 points, otherwise "Watch". Rules can be explained to a parent and checked by hand, which a model's guess cannot.
+  - **Plain-word questions** (`apps/fees/ask.py`, `fees:ask`) send Claude only the question and the names of the college's academic years, active batches and fee heads. Claude answers with structured output (a JSON schema whose enums are those names) choosing one report (dues, at risk, collections) and its filters; we then open that report, so every number is from our database. A question with six or more digits in a row (a phone, roll or Aadhaar number) is refused before anything is sent. The model is `FEES_AI_MODEL` (default Claude Haiku, cheap and fast). Without `ANTHROPIC_API_KEY`, or with `ai_questions` off in a college's config, the box is hidden and nothing else changes. Any failure tells the user to use the filters.
+  - **Reminder drafts** (`apps/fees/reminders.py`, `/fees/reminders/<id>/`, `fees.send_reminder` for principal, accounts and office) are filled in from templates in English and Tamil (`reminder_templates` in config) on our server, with an "Open in WhatsApp" link to the student's mobile. Staff send them from their own phone; KalviOne sends nothing.
+- **Alternatives:** Letting a model write SQL or read dues (sends student data out and gives numbers we cannot vouch for); a model scoring risk (harder to explain, needs student data); sending reminders through a WhatsApp Business API (cost, templates to approve, and a send step the college has not asked for yet).
+- **Consequences:** The question box needs an API key in production. Risk rules are fixed in code for now; per-college weights can move to config when a college asks. Model-written reminder wording and a live WhatsApp sender can come later behind the same pages.

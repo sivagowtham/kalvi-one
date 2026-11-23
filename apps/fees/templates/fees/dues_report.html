@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Fee dues{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0 .75rem; }
+.filters label { margin-top: .75rem; }
+.check { display: flex; gap: .5rem; align-items: center; margin-top: 1rem; font-weight: 400; }
+.scroll { overflow-x: auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: .75rem; }
+.tile strong { display: block; font-size: 1.125rem; }
+{% endblock %}
+{% block content %}
+<div class="row"><h1>Fee dues</h1><span><a href="{% url 'fees:at_risk' %}">At risk</a> · <a href="{% url 'fees:collections_report' %}">Collections</a></span></div>
+{% include "fees/_ask.html" %}
+<form method="get">
+  <div class="filters">
+    <div><label for="id_academic_year">Year</label>{{ form.academic_year }}</div>
+    <div><label for="id_batch">Batch</label>{{ form.batch }}</div>
+    <div><label for="id_head">Fee head</label>{{ form.head }}</div>
+  </div>
+  <label class="check">{{ form.overdue }} {{ form.overdue.label }}</label>
+  <div class="actions"><button type="submit">Show</button>
+    <a class="button secondary" href="?{{ query }}{% if query %}&amp;{% endif %}format=xlsx">Download Excel</a></div>
+</form>
+
+<div class="tiles">
+  <div class="tile"><span class="muted">To collect</span><strong class="amount">₹{{ totals.payable|inr }}</strong></div>
+  <div class="tile"><span class="muted">Collected</span><strong class="amount">₹{{ totals.paid|inr }}</strong></div>
+  <div class="tile"><span class="muted">Left</span><strong class="amount">₹{{ totals.balance|inr }}</strong></div>
+  <div class="tile"><span class="muted">Expected from government</span><strong class="amount">₹{{ totals.govt_share|inr }}</strong></div>
+</div>
+
+<div class="scroll"><table>
+  <tr><th>Batch</th><th class="right">Owing</th><th class="right">Left (₹)</th></tr>
+  {% for row in batches %}
+    <tr><td><a href="?{{ query }}{% if query %}&amp;{% endif %}batch={{ row.batch_id }}">{{ row.batch }}</a></td>
+      <td class="right">{{ row.owing }} of {{ row.students }}</td>
+      <td class="right amount">{{ row.balance|inr }}</td></tr>
+  {% empty %}
+    <tr><td colspan="3" class="muted">No dues match.</td></tr>
+  {% endfor %}
+</table></div>
+
+{% if batch %}
+  <h2 style="font-size:1rem;margin-top:1.5rem">Students owing in {{ batch }}</h2>
+  <ul class="list">
+    {% for row in owing %}
+      <li>{% if can_collect %}<a href="{% url 'fees:collect_student' row.student_id %}" class="row">{% else %}<div class="row">{% endif %}<span><strong>{{ row.roll_number }}</strong> · {{ row.name }}</span><span class="amount">₹{{ row.balance|inr }}</span>{% if can_collect %}</a>{% else %}</div>{% endif %}</li>
+    {% empty %}
+      <li class="muted">Nobody owes anything here.</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

@@ -15,6 +15,8 @@ from apps.accounts.models import RoleAssignment, User
 from apps.accounts.roles import STAFF_ROLES, Role
 from apps.admissions.models import Application, Intake
 from apps.audit.context import audit_context
+from apps.fees.dues import raise_dues
+from apps.fees.models import FeeHead, FeeStructure, FeeStructureLine, Instalment, PaymentAccount
 from apps.students.fakes import fake_aadhaar
 from apps.students.models import (
     Batch,
@@ -27,6 +29,27 @@ from apps.students.models import (
 from apps.students.promotion import place
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
+
+FEE_HEADS = (
+    ("TUITION", "Tuition fee", "Tuition Fees"),
+    ("DEVELOPMENT", "Development fee", "Development Fees"),
+    ("EXAM", "Examination fee", "Examination Fees"),
+)
+PAYMENT_ACCOUNTS = (
+    ("Cash counter", "cash", "Cash"),
+    ("Demo Bank current account", "bank", "Demo Bank A/c"),
+)
+FEE_INSTALMENTS = (
+    (1, "Semester 1", dt.date(2026, 7, 15)),
+    (2, "Semester 2", dt.date(2026, 12, 31)),
+)
+FEE_LINES = (
+    (1, "TUITION", "25000"),
+    (1, "DEVELOPMENT", "5000"),
+    (1, "EXAM", "1500"),
+    (2, "TUITION", "25000"),
+    (2, "EXAM", "1500"),
+)
 
 DEFAULT_PASSWORD = "kalvione-demo-123"  # noqa: S105  (fake demo data only)
 
@@ -211,6 +234,7 @@ class Command(BaseCommand):
             odd_term = Semester.objects.get(academic_year=year, term=Semester.Term.ODD)
             self._seed_students(spec, fake, batches, odd_term)
             self._seed_admissions(spec, fake, programmes.values(), year)
+            self._seed_fees(batches, year)
             first_department = departments[spec.departments[0][0]]
             self.stdout.write(f"\n{college.name}  ->  http://{college.slug}.localhost:8000/admin/")
             for suffix, roles in USERS:
@@ -241,6 +265,36 @@ class Command(BaseCommand):
                     if first is not None and first.user_id is None:
                         first.user = user
                         first.save()
+
+    def _seed_fees(self, batches, year) -> None:
+        """Fake fee heads, payment accounts and a first-year structure per batch (D10)."""
+        heads = {}
+        for order, (code, name, ledger) in enumerate(FEE_HEADS, start=1):
+            heads[code] = FeeHead.objects.get_or_create(
+                code=code, defaults={"name": name, "tally_ledger": ledger, "sort_order": order}
+            )[0]
+        for name, kind, ledger in PAYMENT_ACCOUNTS:
+            PaymentAccount.objects.get_or_create(
+                name=name, defaults={"kind": kind, "tally_ledger": ledger}
+            )
+        for batch in batches:
+            structure, created = FeeStructure.objects.get_or_create(
+                batch=batch, academic_year=year, quota="", residence=""
+            )
+            if created:
+                self._fill_structure(structure, heads)
+            raise_dues(batch, year)
+
+    def _fill_structure(self, structure, heads) -> None:
+        for number, label, due in FEE_INSTALMENTS:
+            Instalment.objects.create(structure=structure, number=number, label=label, due_date=due)
+        for number, code, amount in FEE_LINES:
+            FeeStructureLine.objects.create(
+                structure=structure,
+                instalment_number=number,
+                head=heads[code],
+                amount=Decimal(amount),
+            )
 
     def _seed_admissions(self, spec: CollegeSpec, fake, programmes, year) -> None:
         """Seats per quota and a few fake applications at each status (D10, D21)."""

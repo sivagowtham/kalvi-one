@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load fees %}
+{% block title %}Receipt {{ receipt.number }}{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block extra_style %}{% include "fees/_style.html" %}{% endblock %}
+{% block content %}
+<div class="row"><h1>Fee receipt</h1>{% if receipt.is_cancelled %}<span class="stamp">CANCELLED</span>{% endif %}</div>
+<table>
+  <tr><th>Receipt no.</th><td>{{ receipt.number }}</td></tr>
+  <tr><th>Date</th><td>{{ receipt.date|date:"d M Y" }}</td></tr>
+  <tr><th>Student</th><td>{{ receipt.student.display_name }}</td></tr>
+  <tr><th>Roll no.</th><td>{{ receipt.student.roll_number }}</td></tr>
+  <tr><th>Programme</th><td>{{ receipt.student.batch }}</td></tr>
+</table>
+<table>
+  <tr><th>Fee</th><th>For</th>{% if taxable %}<th class="right">GST</th>{% endif %}<th class="right">Amount (₹)</th></tr>
+  {% for line in lines %}
+    <tr><td>{{ line.head }}</td><td>{{ line.instalment_label }}</td>
+      {% if taxable %}<td class="right amount">{% if line.gst_rate %}{{ line.gst_rate|floatformat:-2 }}%: {{ line.gst_amount|inr }}{% endif %}</td>{% endif %}
+      <td class="right amount">{{ line.amount|inr }}</td></tr>
+  {% endfor %}
+  <tr><th colspan="{% if taxable %}3{% else %}2{% endif %}">Total</th><td class="right amount total">{{ receipt.amount|inr }}</td></tr>
+</table>
+<p>{{ in_words }}</p>
+<p class="muted">Paid by {{ receipt.get_mode_display }}{% if receipt.reference %} · ref. {{ receipt.reference }}{% endif %} · received by {{ receipt.received_by.get_full_name|default:receipt.received_by.username }}</p>
+{% if taxable %}<p class="muted">GST amounts are included in the fee.</p>{% endif %}
+{% if receipt.is_cancelled %}<p class="muted">Cancelled on {{ receipt.cancelled_at|date:"d M Y" }}: {{ receipt.cancel_reason }}</p>{% endif %}
+<p class="muted">This is a computer-generated receipt.</p>
+
+<div class="actions no-print">
+  <button type="button" onclick="window.print()">Print or save as PDF</button>
+  {% if can_collect %}<a class="button secondary" href="{% url 'fees:collect_student' receipt.student_id %}">Back to student</a>{% endif %}
+  {% if can_cancel %}<a class="button secondary" href="{% url 'fees:cancel_receipt' receipt.pk %}">Cancel receipt</a>{% endif %}
+</div>
+{% endblock %}
