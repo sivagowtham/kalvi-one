@@ -58,6 +58,9 @@ def manifest(request: HttpRequest) -> JsonResponse:
     response = JsonResponse(data, json_dumps_params={"indent": 2})
     response["Content-Type"] = "application/manifest+json"
     response["Cache-Control"] = "public, max-age=3600"
+    # The Android app's college picker reads this from its own origin to check the code.
+    # Safe to share: it only holds the college's public name.
+    response["Access-Control-Allow-Origin"] = "*"
     return response
 
 

@@ -55,7 +55,14 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+  <p id="switch-college" class="muted" style="text-align:center" hidden>
+    <a href="https://localhost/?change=1">Switch college</a>
+  </p>
   <script>
+    // Inside the KalviOne Android app (D33), offer a way back to its college picker.
+    if (navigator.userAgent.includes("KalviOneApp")) {
+      document.getElementById("switch-college").hidden = false;
+    }
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js", { scope: "/" }));
     }

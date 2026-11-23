@@ -1,0 +1,17 @@
+{
+  "appId": "in.kalvione.app",
+  "appName": "KalviOne",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "*.kalvione.in",
+      "kalvione.in"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#1f5fbf",
+    "appendUserAgent": "KalviOneApp"
+  }
+}

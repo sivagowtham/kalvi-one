@@ -73,3 +73,18 @@ def test_pages_link_the_manifest_and_register_the_worker(client, college_a):
 def test_pwa_files_are_get_only(client):
     assert client.post("/manifest.webmanifest").status_code == 405
     assert client.post("/sw.js").status_code == 405
+
+
+def test_manifest_can_be_read_by_the_android_app_picker(client, college_a):
+    response = client.get("/manifest.webmanifest", HTTP_HOST=ALPHA)
+    assert response["Access-Control-Allow-Origin"] == "*"
+
+
+def test_unknown_college_manifest_is_404_so_the_picker_can_say_so(client, college_a):
+    assert client.get("/manifest.webmanifest", HTTP_HOST="nowhere.localhost").status_code == 404
+
+
+def test_pages_offer_switch_college_inside_the_app_only(client, college_a):
+    page = client.get("/login/", HTTP_HOST=ALPHA).content.decode()
+    assert 'href="https://localhost/?change=1"' in page
+    assert 'id="switch-college" class="muted" style="text-align:center" hidden' in page
