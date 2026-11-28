@@ -29,6 +29,14 @@ from apps.students.models import (
 from apps.students.promotion import place
 from apps.tenancy.context import college_context
 from apps.tenancy.models import College
+from apps.timetable import workdays
+from apps.timetable.models import (
+    Allocation,
+    AllocationTeacher,
+    BellSchedule,
+    PeriodSlot,
+    TimetableEntry,
+)
 
 FEE_HEADS = (
     ("TUITION", "Tuition fee", "Tuition Fees"),
@@ -49,6 +57,23 @@ FEE_LINES = (
     (1, "EXAM", "1500"),
     (2, "TUITION", "25000"),
     (2, "EXAM", "1500"),
+)
+
+ENGINEERING_PERIODS = (
+    ("09:00", "09:50"),
+    ("09:50", "10:40"),
+    ("11:00", "11:50"),
+    ("11:50", "12:40"),
+    ("13:30", "14:20"),
+    ("14:20", "15:10"),
+    ("15:10", "16:00"),
+)
+ARTS_PERIODS = (
+    ("09:30", "10:30"),
+    ("10:30", "11:30"),
+    ("11:45", "12:45"),
+    ("13:45", "14:45"),
+    ("14:45", "15:45"),
 )
 
 DEFAULT_PASSWORD = "kalvione-demo-123"  # noqa: S105  (fake demo data only)
@@ -265,6 +290,56 @@ class Command(BaseCommand):
                     if first is not None and first.user_id is None:
                         first.user = user
                         first.save()
+            faculty = User.objects.get(college=college, username=f"faculty@{spec.email_domain}")
+            self._seed_timetable(college, batches, odd_term, faculty)
+
+    def _seed_timetable(self, college, batches, term, teacher) -> None:
+        """A bell schedule, the term's calendar and a few classes for the demo teacher (D10)."""
+        engineering = college.college_type == College.CollegeType.ENGINEERING
+        if not engineering and "timetable" not in (college.config or {}):
+            # Show the day-order cycle many arts and science colleges use.
+            college.config = (college.config or {}) | {"timetable": {"cycle": "day_order"}}
+            college.save()
+        times = ENGINEERING_PERIODS if engineering else ARTS_PERIODS
+        schedule, _ = BellSchedule.objects.get_or_create(
+            name="Regular", defaults={"is_default": True}
+        )
+        periods = []
+        for number, (start, end) in enumerate(times, start=1):
+            periods.append(
+                PeriodSlot.objects.get_or_create(
+                    schedule=schedule,
+                    number=number,
+                    defaults={
+                        "start_time": dt.time.fromisoformat(start),
+                        "end_time": dt.time.fromisoformat(end),
+                    },
+                )[0]
+            )
+        workdays.fill(term.start_date, term.end_date, {dt.date(2026, 10, 2): "Gandhi Jayanti"})
+        index = 0
+        for batch in batches:
+            courses = Course.objects.filter(programme=batch.programme, semester_number=1)
+            for section in batch.sections.order_by("name"):
+                for course in courses:
+                    allocation, created = Allocation.objects.get_or_create(
+                        semester=term,
+                        course=course,
+                        section=section,
+                        lab_group=None,
+                        defaults={"hours_per_week": 4},
+                    )
+                    if created:
+                        AllocationTeacher.objects.create(allocation=allocation, teacher=teacher)
+                        # Different periods for each class, so the teacher never clashes.
+                        for day in range(1, 5):
+                            TimetableEntry.objects.create(
+                                allocation=allocation,
+                                day=day,
+                                period=periods[(index + day) % len(periods)],
+                                room=f"Room {101 + index}",
+                            )
+                    index += 1
 
     def _seed_fees(self, batches, year) -> None:
         """Fake fee heads, payment accounts and a first-year structure per batch (D10)."""

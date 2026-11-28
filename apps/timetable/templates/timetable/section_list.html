@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Section timetables{% endblock %}
+{% block extra_style %}{% include "timetable/_style.html" %}{% endblock %}
+{% block content %}
+<div class="row"><h1>Section timetables</h1><a href="{% url 'timetable:mine' %}">Mine</a></div>
+{% include "timetable/_term.html" %}
+<ul class="list">
+  {% for section in sections %}
+    <li><a href="{% url 'timetable:section' section.pk %}?term={{ term.pk }}"><strong>{{ section }}</strong><br><span class="muted">{{ section.batch.programme.name }}</span></a></li>
+  {% empty %}
+    <li class="muted">No section has a timetable for this term yet.</li>
+  {% endfor %}
+</ul>
+<p class="muted"><a href="{% url 'home' %}">Home</a></p>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Fill in a term's calendar</h1>
+<p>Every date of the term gets a row. Days the college does not work and the holidays you list become holidays.
+{% if cycle == "day_order" %}Working days get day orders in turn, carrying on from the last working day before the term.{% else %}Each working day follows its own weekday's timetable; change a Saturday that follows another day afterwards.{% endif %}
+Dates already in the calendar are kept as they are.</p>
+<form method="post">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <p><input type="submit" class="default" value="Fill in the calendar"></p>
+</form>
+{% endblock %}

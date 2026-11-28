@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}My timetable{% endblock %}
+{% block extra_style %}{% include "timetable/_style.html" %}{% endblock %}
+{% block content %}
+<div class="row"><h1>My timetable</h1><a href="{% url 'timetable:sections' %}">Sections</a></div>
+<p class="banner">{{ today|date:"l j M Y" }}:
+  {% if calendar is None %}not in the college calendar yet.
+  {% elif calendar.is_working %}{{ calendar.day_label }}{% if calendar.note %} ({{ calendar.note }}){% endif %}.
+  {% else %}holiday{% if calendar.note %}, {{ calendar.note }}{% endif %}.{% endif %}</p>
+{% include "timetable/_term.html" %}
+{% if not term %}
+  <p class="muted">No term is set up yet.</p>
+{% else %}
+  <nav class="chips" aria-label="Day">
+    {% for number, label in days %}<a href="?day={{ number }}&amp;term={{ term.pk }}" class="{% if number == day %}on{% endif %}{% if number == today_day %} today{% endif %}">{{ label }}</a>{% endfor %}
+  </nav>
+  <ul class="list">
+    {% for entry in entries %}
+      <li>{% include "timetable/_entry.html" with show_section=True %}</li>
+    {% empty %}
+      <li class="muted">No classes for you on {{ day_label }}.</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+<p class="muted"><a href="{% url 'home' %}">Home</a></p>
+{% endblock %}

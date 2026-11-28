@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ section }} timetable{% endblock %}
+{% block extra_style %}{% include "timetable/_style.html" %}{% endblock %}
+{% block content %}
+<div class="row"><h1>{{ section }}</h1><a href="{% url 'timetable:sections' %}{% if term %}?term={{ term.pk }}{% endif %}">Sections</a></div>
+{% include "timetable/_term.html" %}
+{% for number, label, entries in days %}
+  <section class="day">
+    <h2>{{ label }}</h2>
+    <ul class="list">
+      {% for entry in entries %}
+        <li>{% include "timetable/_entry.html" with show_teacher=True %}</li>
+      {% empty %}
+        <li class="muted">No classes.</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endfor %}
+<p class="muted"><a href="{% url 'home' %}">Home</a></p>
+{% endblock %}
