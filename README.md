@@ -2,7 +2,7 @@
 
 KalviOne is a multi-tenant ERP for colleges. One codebase serves every college. Each college gets its own subdomain, and the differences between colleges are configuration, never forks (see [docs/decisions.md](docs/decisions.md)).
 
-The foundation is done: scaffold, multi-tenancy, authentication and roles, audit log, and a minimal academic core. Students and Admissions is done, and Fees (with a daily Tally file and AI helpers for dues) is being built in small pull requests. Marks and attendance come later.
+The foundation is done: scaffold, multi-tenancy, authentication and roles, audit log, and a minimal academic core. Students and Admissions and Fees (with a daily Tally file and AI helpers for dues) are done. Attendance and Timetable is being built in small pull requests. Marks come later.
 
 ## Run it locally
 
@@ -40,7 +40,7 @@ make check              # everything CI runs
 | Path | What it holds |
 | --- | --- |
 | `config/` | Settings for dev, test and prod, plus URLs, WSGI and ASGI |
-| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions), `audit` (append-only audit log), `academics` (departments, programmes, courses, years, terms), `students` (batches, sections, the student record, guardians, consent, field encryption, per-term placement, promotion and Excel import), `admissions` (seats per quota, applications, enrolment, rank lists), `fees` (fee heads, payment accounts and structures with Tally ledger names, concessions, student dues, receipts on a phone-first counter page, dues and collection reports, and the daily Tally XML file) |
+| `apps/` | Django apps: `core`, `tenancy` (College, TenantModel, middleware), `accounts` (users, roles, permissions), `audit` (append-only audit log), `academics` (departments, programmes, courses, years, terms), `students` (batches, sections, the student record, guardians, consent, field encryption, per-term placement, promotion and Excel import), `admissions` (seats per quota, applications, enrolment, rank lists), `fees` (fee heads, payment accounts and structures with Tally ledger names, concessions, student dues, receipts on a phone-first counter page, dues and collection reports, and the daily Tally XML file), `timetable` (bell schedules, the working calendar with weekday or day-order cycles, lab groups, teaching allocations and rosters, and the weekly plan with clash checks) |
 | `tests/testapp/` | Models used only by tests to exercise TenantModel |
 | `tests/` | Project-wide tests |
 | `docs/decisions.md` | Every architecture decision and its reasons |

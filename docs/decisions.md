@@ -42,6 +42,9 @@ How to use this file:
 | D30 | Dues and collection reports are phone-friendly pages with Excel downloads; the admissions fee tick box stays for now | Accepted |
 | D31 | The Tally file holds each receipt once, as a Receipt voucher in Tally's own import XML; cancellations follow as Cancel vouchers | Accepted |
 | D33 | The Android app reuses the web screens: an installable PWA first, then a thin Capacitor shell for the Play Store; pages are never cached on the phone | Accepted |
+| D34 | Attendance and timetable is the third domain module, in `timetable`, `attendance` and `notify` apps; every option is per-college configuration | Accepted |
+| D35 | Bell schedules are rows (one default, others per programme); the calendar has a row per date that names the timetable day it follows, weekday or day order | Accepted |
+| D36 | A class is an allocation (course, section or lab group, term, teachers); clashes are compared by period times and refused on every save | Accepted |
 
 ---
 
@@ -474,3 +477,47 @@ How to use this file:
   - The app lives in `mobile/` (`appId` `in.kalvione.app`). Its only local page is the college picker. It may navigate within `*.kalvione.in` only, adds `KalviOneApp` to its user agent so pages can show a "Switch college" link, and turns Android backups off. The college manifest sends `Access-Control-Allow-Origin: *` so the picker can confirm a college code; it holds only the college's public name.
   - GitHub Actions builds a debug APK for every change under `mobile/`.
 - **Consequences:** Icons are served by a Django view because production has no static file server yet. Bump `CACHE_VERSION` in `apps/pwa/views.py` whenever `sw.js` or the offline page changes. The store app needs a live HTTPS server and a Google Play developer account.
+
+## D34. Attendance and timetable is the third domain module
+
+- **Date:** 2026-11-28
+- **Status:** Accepted (Gowtham approved the module plan with its defaults; each college's answers to the onboarding questionnaire may change its settings)
+- **Context:** Attendance is what teaching staff use every day, mostly from a phone. Colleges differ in how they run it: weekdays or a day order, how many periods, whether the 75% limit is per subject or overall, what counts as present, and how parents are told. Gowtham (2026-11-28): every option must be configurable per college, set from the college's answers before it goes live.
+- **Decision:**
+  - Build it as three apps in six small pull requests: `timetable` (bell schedules, calendar, lab groups, allocations, the weekly plan), `attendance` (marking, leave, reports, AI help) and `notify` (an outbox for parent messages with swappable WhatsApp and SMS providers, reusable by fees later). The order is timetable set-up, marking from a phone, reports and the shortage list, parent alerts, AI help, and a draft timetable generator.
+  - `timetable` depends on academics and students; `attendance` depends on `timetable`; nothing depends on `attendance` except reports and other modules reading its results through functions.
+  - Every college difference is a setting in `College.config` (documented in each app's `config.py`) or set-up data such as bell schedules, never a branch in code (D1). Defaults suit a Tamil Nadu college that has not answered yet.
+  - The per-college questions are listed at the end of the module plan, for the onboarding questionnaire.
+  - Not in this module: biometric or RFID devices, students marking themselves, staff attendance, hostel and bus attendance, exam hall attendance and the parent app.
+- **Alternatives:** One `attendance` app holding the timetable too (the timetable is also needed by exams and staff workload, so it stands alone); hard-coded Anna University and Bharathiar University rules (breaks D1 and fits only two universities).
+- **Consequences:** Exams can read allocations and rosters from `timetable` and attendance percentages from `attendance` without models of their own for them. Decision numbers D34 to D49 are kept for this module.
+
+## D35. Bell schedules and the working calendar
+
+- **Date:** 2026-11-28
+- **Status:** Accepted
+- **Context:** Most colleges have one set of period timings, but shift colleges run morning and afternoon streams with different ones. Some colleges plan their timetable by weekday; many arts and science colleges use a day order (Day 1 to Day 6) that moves on only on working days, so a holiday does not lose one day's classes. Saturdays may be holidays, or follow another day's timetable.
+- **Decision:**
+  - `BellSchedule` holds a set of `PeriodSlot`s (number, start and end time). One schedule is the college's default, which the database enforces; `ScheduleProgramme` puts a programme on another schedule. Periods of one schedule may not overlap. Breaks are the gaps between periods.
+  - `CalendarDay` is one row per date: a working day names the timetable `day` it follows; a holiday has none and may have a note. The database refuses a working day without a day and a holiday with one.
+  - `College.config["timetable"]` holds `cycle` (`weekday` or `day_order`), `day_order_count` (6), `working_weekdays` (Monday to Saturday) and `day_order_label` ("Day {n}"), documented in `apps/timetable/config.py`.
+  - The principal fills in a term from the admin ("Fill in a term") with a list of holidays. In a weekday cycle each working day follows its own weekday; in a day-order cycle day orders run on from the last working day before the term. Dates already in the calendar are kept. Turning a working day into a holiday (or back) in a day-order college moves the later day orders on, and there is an admin action to do it from any date.
+  - A weekday-cycle college that has not filled in its calendar still gets each day's timetable from the weekday. A day-order college needs its calendar.
+  - The principal owns schedules and the calendar; everyone who teaches or plans can see them.
+- **Alternatives:** Periods as a config list (attendance rows need a stable period to point at); a day order worked out on the fly from holidays (slow, and a change to an old holiday would silently move past attendance to other days); one bell schedule per college (does not fit shift colleges).
+- **Consequences:** Once attendance is marked (PR 2), moving a day order must not change days that already have attendance; that rule comes with attendance. A Saturday that follows Monday is one edit of its calendar row.
+
+## D36. Allocations, lab groups, rosters and clash checks
+
+- **Date:** 2026-11-28
+- **Status:** Accepted
+- **Context:** A timetable says which course a section has, with which teacher, in which room, in each period. Labs and tutorials are often taught to half a section (B1, B2) at the same time, by two teachers. Electives are taken by some students of a section. A teacher, a section or a room double-booked is the commonest timetable mistake.
+- **Decision:**
+  - `Allocation` is a course taught to a section, or to one `LabGroup` of it, in one term, with `hours_per_week` and `block_length` for the generator (PR 6). Its course must be of the section's programme. `AllocationTeacher` lists its teachers, who must be active staff of the college. HODs plan their own department's allocations (D14); the principal plans any.
+  - `LabGroup` (section, term, name) has `LabGroupMember`s; a student is in at most one group of a section per term. The admin can share a section's students evenly among its groups by roll number.
+  - `AllocationStudent` is an elective's roster. `apps.timetable.rosters.roster(allocation)` is the one way to ask who is in a class: the elective roster if it has one, otherwise the lab group's members, otherwise the students placed in the section that term (D17), studying students only.
+  - `TimetableEntry` is an allocation on a day in a period, with a room. Every save locks the term and refuses a clash: the section (or the same lab group, or the whole section against a group) already busy, a teacher already busy, or the room already taken. Clashes compare period times, not numbers, so programmes on different bell schedules are checked against each other. Adding a teacher to an allocation runs the same teacher check. A period must come from the programme's bell schedule, and the day must be one of the college's days.
+  - Staff see "My timetable" (`/timetable/`, opening on today's day from the calendar) and each section's week (`/timetable/sections/`) on phone-first pages. Set-up is in the admin.
+- **Alternatives:** Database exclusion constraints for clashes (they cannot compare times across schedules or follow a teacher through allocations without copying data); one teacher per allocation (labs have two); course registration for electives now (waits for the exams module's curriculum work).
+- **Consequences:** The plan said the database would refuse clashes; it is the model's save, under a lock on the term, that refuses them, because the rules span several tables. Bulk writes would skip the check, and are already refused for audited models (D8). Exams will use allocations for who enters marks for which class, and `roster()` for its students.
+

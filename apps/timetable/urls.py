@@ -1,0 +1,11 @@
+from django.urls import path
+
+from . import views
+
+app_name = "timetable"
+
+urlpatterns = [
+    path("", views.my_timetable, name="mine"),
+    path("sections/", views.section_list, name="sections"),
+    path("sections/<int:pk>/", views.section_timetable, name="section"),
+]

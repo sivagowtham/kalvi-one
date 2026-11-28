@@ -128,3 +128,21 @@ def test_refuses_when_not_allowed():
     with pytest.raises(CommandError, match="disabled"):
         seed()
     assert College.objects.count() == 0
+
+
+def test_seed_adds_a_timetable_for_the_demo_teacher():
+    from apps.timetable.models import CalendarDay, TimetableEntry
+
+    seed("--with-second-college")
+    demo = College.objects.get(slug="demo")
+    sample = College.objects.get(slug="sample")
+    with college_context(demo):
+        teacher = User.objects.get(username="faculty@demo.example")
+        assert TimetableEntry.objects.filter(allocation__teachers__teacher=teacher).count() == 8
+        assert CalendarDay.objects.get(date="2026-10-02").note == "Gandhi Jayanti"
+    with college_context(sample):
+        assert CalendarDay.objects.get(date="2026-06-15").day == 1  # day order 1
+    assert sample.config["timetable"]["cycle"] == "day_order"
+    seed("--with-second-college")  # a second run adds nothing new
+    with college_context(demo):
+        assert TimetableEntry.objects.count() == 8

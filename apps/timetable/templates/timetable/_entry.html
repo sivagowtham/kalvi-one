@@ -1,0 +1,7 @@
+<div class="slot">
+  <div class="time"><strong>P{{ entry.period.number }}</strong>{{ entry.period.start_time|time:"H:i" }}–{{ entry.period.end_time|time:"H:i" }}</div>
+  <div>
+    <strong>{{ entry.allocation.course.code }}</strong> · {{ entry.allocation.course.title }}<br>
+    <span class="muted">{% if show_section %}{{ entry.allocation.section }}{% if entry.allocation.lab_group %} {{ entry.allocation.lab_group.name }}{% endif %}{% elif entry.allocation.lab_group %}{{ entry.allocation.lab_group.name }} only{% endif %}{% if entry.room %}{% if show_section or entry.allocation.lab_group %} · {% endif %}{{ entry.room }}{% endif %}{% if show_teacher and entry.teacher_names %} · {{ entry.teacher_names }}{% endif %}</span>
+  </div>
+</div>
