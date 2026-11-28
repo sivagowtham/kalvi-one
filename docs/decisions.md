@@ -41,6 +41,7 @@ How to use this file:
 | D29 | Receipts are taken on a phone-first counter page, settle the oldest dues first, are numbered per financial year and are cancelled, never deleted | Accepted |
 | D30 | Dues and collection reports are phone-friendly pages with Excel downloads; the admissions fee tick box stays for now | Accepted |
 | D31 | The Tally file holds each receipt once, as a Receipt voucher in Tally's own import XML; cancellations follow as Cancel vouchers | Accepted |
+| D33 | The Android app reuses the web screens: an installable PWA first, then a thin Capacitor shell for the Play Store; pages are never cached on the phone | Accepted |
 
 ---
 
@@ -458,3 +459,18 @@ How to use this file:
   - **Reminder drafts** (`apps/fees/reminders.py`, `/fees/reminders/<id>/`, `fees.send_reminder` for principal, accounts and office) are filled in from templates in English and Tamil (`reminder_templates` in config) on our server, with an "Open in WhatsApp" link to the student's mobile. Staff send them from their own phone; KalviOne sends nothing.
 - **Alternatives:** Letting a model write SQL or read dues (sends student data out and gives numbers we cannot vouch for); a model scoring risk (harder to explain, needs student data); sending reminders through a WhatsApp Business API (cost, templates to approve, and a send step the college has not asked for yet).
 - **Consequences:** The question box needs an API key in production. Risk rules are fixed in code for now; per-college weights can move to config when a college asks. Model-written reminder wording and a live WhatsApp sender can come later behind the same pages.
+
+## D33. Android app: installable web app first, then a thin store shell
+
+- **Date:** 2026-11-23
+- **Status:** Accepted (Gowtham chose this on 2026-11-23)
+- **Context:** Gowtham wants an Android app. Most staff use phones. Every KalviOne screen is a server-rendered Django page, there is no JSON API, and there is no live server yet.
+- **Decision:**
+  - Step 1: KalviOne is an installable Progressive Web App. Each college's host serves its own `/manifest.webmanifest` (named after the college), a service worker at `/sw.js`, an `/offline/` page and the app icons under `/app/icons/`. All are `@public` and hold nothing beyond the college's name.
+  - The service worker never caches pages or API responses, because they hold personal data (D18). It only keeps the offline page and the icons, and shows the offline page when a page cannot load.
+  - Step 2: one Play Store app built with Capacitor in `android/`, loading the college's own address. On first launch the user picks their college. The shell adds push notifications, the camera for document scanning and fingerprint unlock. New web screens appear in the app with no extra work.
+  - A JSON API is added only for screens that need it, such as offline attendance marking.
+- **Alternatives:** Flutter or React Native (every screen built twice, plus a full API first); a Trusted Web Activity wrapper (each new college's address must be added to the app and a new version shipped, and there are no native plugins).
+  - The app lives in `mobile/` (`appId` `in.kalvione.app`). Its only local page is the college picker. It may navigate within `*.kalvione.in` only, adds `KalviOneApp` to its user agent so pages can show a "Switch college" link, and turns Android backups off. The college manifest sends `Access-Control-Allow-Origin: *` so the picker can confirm a college code; it holds only the college's public name.
+  - GitHub Actions builds a debug APK for every change under `mobile/`.
+- **Consequences:** Icons are served by a Django view because production has no static file server yet. Bump `CACHE_VERSION` in `apps/pwa/views.py` whenever `sw.js` or the offline page changes. The store app needs a live HTTPS server and a Google Play developer account.
