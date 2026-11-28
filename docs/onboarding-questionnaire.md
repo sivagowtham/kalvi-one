@@ -1,6 +1,6 @@
 # KalviOne: College Onboarding Questionnaire
 
-Version 1.1, 28 Nov 2026. This is a living document: see "Keeping this questionnaire up to date" at the end.
+Version 1.2, 28 Nov 2026. This is a living document: see "Keeping this questionnaire up to date" at the end.
 
 Each college answers this before KalviOne is switched on for it. Every answer becomes a setting or set-up data for that college only, so one KalviOne serves every college in its own way (D1). The Word copy that goes to colleges is built from this file.
 
@@ -185,20 +185,22 @@ _Who fills: ERP coordinator with office and accounts._
 | I6 | Contract end date and notice period with the current supplier | 31 May 2027, 3 months | | Go-live date |
 | I7 | Records kept only on paper that matter most | Old admission registers | Not loaded unless asked | Migration plan |
 
-## Part J: Exams and marks *(planned)*
+## Part J: Exams and marks *(being built)*
 
 _Who fills: exam cell or COE with the principal._
 
 | # | Question | Example or choices | Default if not answered | Sets |
 | --- | --- | --- | --- | --- |
-| J1 | Who sets and runs the end-semester exams? | University / College (autonomous COE) | University | Exams module |
-| J2 | Internal assessment pattern: number of tests, assignments, and how internal marks are worked out | 2 CIA tests of 50, best of 2, plus assignment, to 40 | | Internal marks rules |
-| J3 | Internal and external marks split per subject type | Theory 40/60, practical 60/40 | | Marks rules |
-| J4 | Grading scheme and pass marks (attach the regulation page) | 10-point CGPA, pass 50 | As in the regulation | Grading |
+| J1 | Who sets and runs the end-semester exams? | University / College (autonomous COE) | University | `exams_autonomous` feature flag |
+| J2 | Internal assessment pattern: number of tests, assignments, and how internal marks are worked out | 2 CIA tests of 50, best of 2, plus assignment, to 40 | The university preset (`load_exam_schemes`) | `SchemeComponent` |
+| J3 | Internal and external marks split per subject type | Theory 40/60, practical 60/40 | The university preset | `AssessmentScheme` maximums |
+| J4 | Grading scheme and pass marks (attach the regulation page) | 10-point CGPA, pass 50 | As in the regulation | `GradeScale`, `AssessmentScheme` pass rule |
 | J5 | Arrears, revaluation and supplementary exams handled by the college? | | | Exams module |
 | J6 | Do you print hall tickets, mark statements or provisional certificates? | | | Exams module |
 | J7 | University portal you upload internal marks to, and its file format | Anna University COE portal, Excel | | Exports |
 | J8 | A full copy of each regulation your running batches follow (attach the PDF or give the university link) | Anna University R2021 and R2025 | We download it from the university site | `Batch.regulation`, marks rules |
+| J9 | How are internal marks rounded once added up? | Up to the next whole mark / nearest / not rounded | Up to the next whole mark | `exams.internal_rounding` |
+| J10 | Codes a teacher can enter instead of a mark | AB absent, MAL malpractice, WH withheld | AB, MAL, WH (each counts as zero) | `exams.mark_codes` |
 
 ## Part K: Staff, HR, payroll and other modules *(planned)*
 
@@ -232,7 +234,7 @@ _Who fills: principal and accounts._
 - [ ] Bell schedule and current timetable (G3)
 - [ ] Workload list: who teaches what to whom (G11)
 - [ ] Sample attendance register and shortage list (G16)
-- [ ] Internal marks rules, and a full copy of each regulation *(planned)* (J2 to J4, J8)
+- [ ] Internal marks rules, and a full copy of each regulation (J2 to J4, J8)
 
 ## Part M: Sign-off
 
