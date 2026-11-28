@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f5fbf">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/app/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
   <title>{% block title %}{% if college %}{{ college.name }}{% else %}KalviOne{% endif %}{% endblock %}</title>
   <style>
     :root { --bg: #f5f6f8; --card: #fff; --text: #1d2430; --muted: #5b6575; --line: #d9dde3;
@@ -51,5 +55,17 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+  <p id="switch-college" class="muted" style="text-align:center" hidden>
+    <a href="https://localhost/?change=1">Switch college</a>
+  </p>
+  <script>
+    // Inside the KalviOne Android app (D33), offer a way back to its college picker.
+    if (navigator.userAgent.includes("KalviOneApp")) {
+      document.getElementById("switch-college").hidden = false;
+    }
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js", { scope: "/" }));
+    }
+  </script>
 </body>
 </html>
