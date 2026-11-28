@@ -10,3 +10,4 @@
 - Every view needs `@require_perm("code")` or `@public` (D7); register new codes in the app's `grants.py`. The default-deny test fails otherwise.
 - Models holding college data mix in `apps.audit.mixins.Audited` (D8). Never bypass it with queryset `update()`/`bulk_*` or raw SQL; use `apps.audit.bulk.audited_update()`.
 - Sensitive personal data (Aadhaar, community certificate number, income) is encrypted per field (D18). Write it with `set_secret()` and read it only with `reveal()`, which checks `students.view_sensitive` and audits the read (D19). Never log or display ciphertext or decrypted values elsewhere.
+- Every per-college setting (a config key, feature flag or set-up data a college must give) gets a question with its default in `docs/onboarding-questionnaire.md` in the same PR, and the Word copy in the project files is rebuilt from it.
