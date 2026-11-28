@@ -515,5 +515,5 @@ How to use this file:
   - Whether a college runs its own end semester exams is the feature flag `exams_autonomous`, read with `config.is_autonomous(college)`; it changes which result path the college sees (D50).
   - Schemes are read by the principal, HODs, faculty, office and exam cell, and changed by the principal and exam cell (`exams.*_assessmentscheme` and friends).
 - **Alternatives:** Loading presets automatically from the college's affiliating university (a wrong guess would silently set pass marks); one preset per college (forbidden by D1).
-- **Consequences:** Grade bands and component splits in the presets must be checked against each college's regulation copy during onboarding. The onboarding questionnaire gets the exams questions once it is on main.
+- **Consequences:** Grade bands and component splits in the presets must be checked against each college's regulation copy during onboarding. The onboarding questionnaire asks for these settings (J1 to J4, J8 to J10).
 
