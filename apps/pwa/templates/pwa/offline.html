@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}No network{% endblock %}
+{% block content %}
+  <h1>You're offline</h1>
+  <p>KalviOne needs the internet to show your college's data. Check your mobile data or Wi-Fi, then try again.</p>
+  <button class="full" type="button" onclick="location.reload()">Try again</button>
+{% endblock %}

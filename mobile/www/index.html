@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f5fbf">
+  <title>KalviOne</title>
+  <style>
+    :root { --bg: #f5f6f8; --card: #fff; --text: #1d2430; --muted: #5b6575; --line: #d9dde3;
+            --accent: #1f5fbf; --accent-text: #fff; --error: #b42318; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #14171c; --card: #1d2128; --text: #e7eaee; --muted: #a3acb9; --line: #343a44;
+              --accent: #5b9bf0; --accent-text: #0d1117; --error: #f18b81; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 26rem; margin: 3rem auto; padding: 0 1rem; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; }
+    .brand { color: var(--muted); font-size: .875rem; margin: 0 0 .25rem; }
+    h1 { font-size: 1.375rem; margin: 0 0 1rem; }
+    label { display: block; font-weight: 600; margin: 1rem 0 .25rem; }
+    input { width: 100%; padding: .625rem .75rem; font: inherit; color: inherit; background: var(--bg);
+            border: 1px solid var(--line); border-radius: 8px; }
+    button { width: 100%; margin-top: 1.25rem; padding: .75rem 1rem; font: inherit; font-weight: 600;
+             border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-text); }
+    button.secondary { background: none; color: var(--accent); border: 1px solid var(--line); }
+    button[disabled] { opacity: .6; }
+    .muted { color: var(--muted); font-size: .875rem; }
+    .error { color: var(--error); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <p class="brand">KalviOne</p>
+
+      <form id="pick" hidden>
+        <h1>Find your college</h1>
+        <p class="muted">Type your college code, as given by your college office. For example, <b>demo</b> for demo.kalvione.in.</p>
+        <label for="code">College code</label>
+        <input id="code" name="code" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        <p id="error" class="error" role="alert" hidden></p>
+        <button id="find" type="submit">Continue</button>
+      </form>
+
+      <div id="confirm" hidden>
+        <h1 id="college-name"></h1>
+        <p class="muted" id="college-url"></p>
+        <button id="open" type="button">Open</button>
+        <button id="back" type="button" class="secondary">Choose another college</button>
+      </div>
+    </div>
+  </main>
+  <script src="address.js"></script>
+  <script src="picker.js"></script>
+</body>
+</html>
