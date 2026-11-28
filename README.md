@@ -2,7 +2,7 @@
 
 KalviOne is a multi-tenant ERP for colleges. One codebase serves every college. Each college gets its own subdomain, and the differences between colleges are configuration, never forks (see [docs/decisions.md](docs/decisions.md)).
 
-The foundation is done: scaffold, multi-tenancy, authentication and roles, audit log, and a minimal academic core. Students and Admissions is done, and Fees (with a daily Tally file and AI helpers for dues) is being built in small pull requests. Marks and attendance come later.
+The foundation is done: scaffold, multi-tenancy, authentication and roles, audit log, and a minimal academic core. Students and Admissions is done, and Fees (with a daily Tally file and AI helpers for dues) is being built in small pull requests. Exams and marks (assessment schemes, marks entry, results and mark sheets) is being built in small pull requests, alongside attendance and timetable.
 
 ## Run it locally
 

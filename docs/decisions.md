@@ -41,6 +41,9 @@ How to use this file:
 | D29 | Receipts are taken on a phone-first counter page, settle the oldest dues first, are numbered per financial year and are cancelled, never deleted | Accepted |
 | D30 | Dues and collection reports are phone-friendly pages with Excel downloads; the admissions fee tick box stays for now | Accepted |
 | D31 | The Tally file holds each receipt once, as a Receipt voucher in Tally's own import XML; cancellations follow as Cancel vouchers | Accepted |
+| D50 | Exams and marks is the fourth domain module, in one `exams` app that reads timetable and attendance only through their functions | Accepted |
+| D51 | Assessment schemes, components, grade scales and pass rules are rows; the arithmetic is one module; anything in use is locked and changed on a copy | Accepted |
+| D52 | Starting schemes for Anna University R2021 and Bharathiar CBCS load by command; exam settings live in `College.config["exams"]`, autonomy is a feature flag | Accepted |
 
 ---
 
@@ -458,3 +461,43 @@ How to use this file:
   - **Reminder drafts** (`apps/fees/reminders.py`, `/fees/reminders/<id>/`, `fees.send_reminder` for principal, accounts and office) are filled in from templates in English and Tamil (`reminder_templates` in config) on our server, with an "Open in WhatsApp" link to the student's mobile. Staff send them from their own phone; KalviOne sends nothing.
 - **Alternatives:** Letting a model write SQL or read dues (sends student data out and gives numbers we cannot vouch for); a model scoring risk (harder to explain, needs student data); sending reminders through a WhatsApp Business API (cost, templates to approve, and a send step the college has not asked for yet).
 - **Consequences:** The question box needs an API key in production. Risk rules are fixed in code for now; per-college weights can move to config when a college asks. Model-written reminder wording and a live WhatsApp sender can come later behind the same pages.
+
+## D50. Exams and marks is the fourth domain module
+
+- **Date:** 2026-11-28
+- **Status:** Accepted (Gowtham approved the exams plan with its defaults)
+- **Context:** Colleges enter internal (CIA) marks every term, send them to the university, and print mark statements and result analyses for NAAC and NBA. PIE Tech follows Anna University and PCAS Bharathiar University, with different splits, pass marks and grades, and either may become autonomous. Attendance and timetable are being built at the same time (D34 to D49).
+- **Decision:**
+  - One app, `exams`, built in seven pull requests: schemes and settings; tests and marks entry; internal marks and the university upload; exam sessions, registration and hall tickets; results (university import for affiliated colleges, dummy-number valuation for autonomous ones); mark sheets and reports; AI help.
+  - Exams depends on academics, students, timetable and attendance, never the reverse. It reads class rosters only through `apps.timetable.rosters.roster(allocation)` and attendance eligibility only through the function the attendance app provides, and adds no models to those apps.
+  - Not in this module: question papers and question banks, exam hall seating, online exams, student and parent result logins, degree certificates, and outcome-based education (CO and PO attainment), which gets its own plan. Tests can hold marks per question, so attainment can come later without re-entering marks.
+- **Alternatives:** Separate apps for internal marks and for results (two apps sharing every model); waiting for the attendance module to finish (the scheme work does not need it).
+- **Consequences:** Exams steps 2 onwards need the timetable's `Allocation`. Decision numbers D50 onwards belong to this module.
+
+## D51. Schemes, grades and pass rules are rows, locked once used
+
+- **Date:** 2026-11-28
+- **Status:** Accepted
+- **Context:** A regulation fixes how a course is assessed: for example 40 internal and 60 end semester, the best two of three tests, a pass needing 45% of the end semester marks and 50% overall, and grades O to RA. Colleges and universities change these between regulations, but a result already published must never change because someone edited a setting.
+- **Decision:**
+  - `AssessmentScheme` is one regulation and course type (theory, practical, theory with practical, project, elective; blank regulation or type is a fallback): internal and end semester maximums, its `GradeScale`, and the pass rule as three minimum percentages (end semester, total, internal). The pass rule lives on the scheme rather than in a separate model, because each scheme has exactly one. Only one scheme is active per regulation and course type, enforced by the database.
+  - `SchemeComponent` is one part of the internal marks: kind (test, model exam, assignment, seminar, quiz, lab, project review, attendance), how many are held, what each is marked out of, whether all count or only the best few, and what it is worth. The components must add up to the internal maximum; the admin refuses a scheme that does not, and `problems()` says what is wrong in plain words.
+  - `GradeScale` and `GradeBand` hold letters, grade points and the percentage each starts at, plus the letters for fail (RA or U), absent, shortage of attendance and withdrawal.
+  - `apps/exams/marks.py` holds all the arithmetic: a component's share, the internal total rounded once at the end (rounding is a college setting), and pass or fail with grade, grade point and the reasons. Missing marks and mark codes count as zero. Marks entry, results, reports and the AI risk list all use it.
+  - A scheme or scale is locked when marks or results first use it (`lock()`, audited). A locked row, its components and its bands cannot be saved or deleted, and the admin opens them read-only with "Make an editable copy". The copy starts inactive, so the exam cell checks it and then swaps which one is active. This replaces the plan's wording of copying a scheme to each batch: locking gives the same safety with one row per regulation.
+- **Alternatives:** A formula language typed by the exam cell (powerful but easy to get wrong and hard to check on a phone); schemes in JSON config (no foreign keys for results to point at); copying a scheme per batch (many identical rows to keep in step).
+- **Consequences:** A course that differs from its type's scheme needs its own course type or a later per-course override. Attendance marks as a component take their figure from the attendance module in step 3.
+
+## D52. Starting presets and per-college exam settings
+
+- **Date:** 2026-11-28
+- **Status:** Accepted
+- **Context:** Most colleges follow their university's regulation, so typing every scheme by hand is wasted effort, but each college must still be able to change anything (D1).
+- **Decision:**
+  - `manage.py load_exam_schemes <preset> --college <slug>` loads a grade scale and schemes from `apps/exams/presets.py`: `anna-r2021` (theory 40/60, practical 60/40, theory with practical 50/50, project 40/60; pass 45% end semester and 50% total; O 91, A+ 81, A 71, B+ 61, B 50, RA) and `bharathiar-cbcs` (theory 25/75, practical 40/60, project 20/80; pass 40% and 40%; O 90 down to C 40, RA). Presets are named after universities, never colleges, are only starting points to check against the regulation copy, and loading twice leaves existing rows alone.
+  - `College.config["exams"]`, documented in `apps/exams/config.py`, holds `internal_rounding` (up, nearest or none; default up) and `mark_codes` (absent, malpractice, withheld). Later steps add their keys there with defaults.
+  - Whether a college runs its own end semester exams is the feature flag `exams_autonomous`, read with `config.is_autonomous(college)`; it changes which result path the college sees (D50).
+  - Schemes are read by the principal, HODs, faculty, office and exam cell, and changed by the principal and exam cell (`exams.*_assessmentscheme` and friends).
+- **Alternatives:** Loading presets automatically from the college's affiliating university (a wrong guess would silently set pass marks); one preset per college (forbidden by D1).
+- **Consequences:** Grade bands and component splits in the presets must be checked against each college's regulation copy during onboarding. The onboarding questionnaire gets the exams questions once it is on main.
+
