@@ -1,6 +1,6 @@
 # KalviOne: College Onboarding Questionnaire
 
-Version 1, 28 Nov 2026. This is a living document: see "Keeping this questionnaire up to date" at the end.
+Version 1.1, 28 Nov 2026. This is a living document: see "Keeping this questionnaire up to date" at the end.
 
 Each college answers this before KalviOne is switched on for it. Every answer becomes a setting or set-up data for that college only, so one KalviOne serves every college in its own way (D1). The Word copy that goes to colleges is built from this file.
 
@@ -198,6 +198,7 @@ _Who fills: exam cell or COE with the principal._
 | J5 | Arrears, revaluation and supplementary exams handled by the college? | | | Exams module |
 | J6 | Do you print hall tickets, mark statements or provisional certificates? | | | Exams module |
 | J7 | University portal you upload internal marks to, and its file format | Anna University COE portal, Excel | | Exports |
+| J8 | A full copy of each regulation your running batches follow (attach the PDF or give the university link) | Anna University R2021 and R2025 | We download it from the university site | `Batch.regulation`, marks rules |
 
 ## Part K: Staff, HR, payroll and other modules *(planned)*
 
@@ -231,7 +232,7 @@ _Who fills: principal and accounts._
 - [ ] Bell schedule and current timetable (G3)
 - [ ] Workload list: who teaches what to whom (G11)
 - [ ] Sample attendance register and shortage list (G16)
-- [ ] Internal marks rules or regulation pages *(planned)* (J2 to J4)
+- [ ] Internal marks rules, and a full copy of each regulation *(planned)* (J2 to J4, J8)
 
 ## Part M: Sign-off
 
